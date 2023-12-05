@@ -1,0 +1,684 @@
+freeCodeCamp.org code along - Microservice Architecture and System Design
+
+Here is a description of the project:
+
+https://youtu.be/hmkF77F9TLw?si=a16Ip4Cw8LKKGCWg&t=27
+
+
+
+I thought this video was worthy of a code along after getting about 35% into the video. 
+
+
+1. Spin up a cloud server from A Cloud Guru. I decided on a Ubuntu Server. 
+
+username: [USERNAME]
+temp_password:: [ACLOUDGURU PASSWORD]
+new_password:[YOUR PASSWORD]
+
+
+
+
+
+2. Installing Docker on Ubuntu
+
+
+Navigated to the following site:
+
+https://docs.docker.com/engine/install/ubuntu/
+
+
+- ran command below to make sure packages were uninstalled:
+
+for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+
+- ran the following commands in order
+
+## Commands to add Docker's official GPG Key
+
+
+
+here is an official explanation of a GPG Key:
+
+A GPG key, or GNU Privacy Guard key, is a cryptographic key pair used for secure communication and data integrity verification. GPG is an implementation of the OpenPGP (Pretty Good Privacy) standard, which provides a framework for encrypting and signing data.
+
+Here are the two main components of a GPG key pair:
+
+1. **Public Key:**
+   - The public key is shared openly and is used for encrypting data that only the holder of the corresponding private key can decrypt.
+   - It is also used to verify digital signatures created with the private key.
+
+2. **Private Key:**
+   - The private key is kept secret and is used for decrypting data encrypted with the corresponding public key.
+   - It is also used to create digital signatures, providing a way to verify that the data has been signed by the holder of the private key.
+
+GPG keys are commonly used for the following purposes:
+
+- **Encryption:** Securely transmitting confidential information. Users can encrypt data using the recipient's public key, and only the recipient, who possesses the corresponding private key, can decrypt it.
+
+- **Digital Signatures:** Verifying the authenticity of a message or file. The sender can sign a message or file using their private key, and anyone with the sender's public key can verify that the signature is valid.
+
+- **Secure Email Communication:** GPG is often used to secure email communication by encrypting the content and verifying the sender's identity through digital signatures.
+
+- **Software Distribution:** Developers can sign their software releases with GPG keys to ensure the integrity of the distributed files and verify that they haven't been tampered with.
+
+GPG is widely used in various contexts where secure communication, data integrity, and authentication are essential. It provides a robust and open-source solution for implementing public-key cryptography.
+
+
+
+sudo apt-get update
+
+sudo apt-get install ca-certificates curl gnupg
+
+sudo install -m 0755 -d /etc/apt/keyrings
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+
+## Commands to Add the repository to Apt sources:
+
+
+
+Here is a description of this step:
+
+The phrase "Add the repository to Apt sources" typically refers to the process of adding a software repository to the list of package sources that the Advanced Package Tool (Apt) on Debian-based Linux systems can use. This is a common step when installing software or packages that are not included in the default set of packages provided by the operating system.
+
+
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+
+sudo apt-get update
+
+
+## Commands to install the latest Docker packages:
+
+
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+docker --version <--this last piece of code is used to confirm the docker installation
+
+
+
+
+
+
+3. Install the Kubernetes command line tool on the server
+
+
+This is just to install kubectl, also known as the kubernetes command line tool, onto the server. Kubernetes will be used in the project. 
+
+
+Navigated to the following site:
+
+https://kubernetes.io/docs/tasks/tools/
+
+Clicked on install and setup kubectl on Linux
+
+I wasn't sure if the architecture was x86 or ARM. Used the code below to check:
+
+dpkg --print-architecture
+
+and got 'amd64' as a response
+
+clicked on the X86-64 option for each of the instructions below. NOTE: AMD64 == X86-64
+
+
+## Commands for installing the kubectl binary using a curl command
+
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+
+
+## Commands to validate the download by using a checksum file
+
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+
+echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+
+expected (and received) output:
+
+kubectl: OK
+
+
+## Commands to install Kubectl
+
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+kubectl version --client  <--this last piece of code is used to confirm the kubernetes installation
+
+
+
+
+
+4. Install minikube for Linux
+
+Minikube is a small kubernetes cluster used to help devs learn kubernetes within their local environments
+
+Navigated to the following site:
+
+https://minikube.sigs.k8s.io/docs/start/
+
+Clicked on the following settings
+
+Operating System: Linux
+
+Architecture: X-86
+
+Release type: Stable
+
+Installer type: Binary download
+
+
+## Commands to install minikube
+
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+minikube start
+
+command showed a problem. It offered a solution to run the command below to add the minikube default user to the docker group?!?
+
+sudo usermod -aG docker $USER && newgrp docker
+
+
+
+5. Download k9s, a kubernetes cluster manager
+
+Navigate to the following site:
+
+https://github.com/derailed/k9s
+
+Scrolled down to the following option and command:
+
+Via Webi for Linux and macOS
+
+curl -sS https://webinstall.dev/k9s | bash
+
+The command provided an additional command as a required action (presumably to add the program to the PATH?!?
+
+source ~/.config/envman/PATH.env
+
+
+
+
+
+
+6. Install python3 for ubuntu
+
+Navigate to the following site:
+
+https://www.python.org/downloads/
+
+Using chatGPT and right-clicking on link to the latest download I constructed the following command. 
+
+Navigated to the following site:
+
+https://www.python.org/downloads/source/
+
+right-clicked on the tarball link for the latest download (should end in .tgz)
+
+curl -O https://www.python.org/ftp/python/3.12.0/Python-3.12.0.tgz
+
+chatGPT next instructed to unzip the file using the following command
+
+tar -xzvf Python-3.12.0.tgz
+
+chatGPT next instructed me to move into a specific folder
+
+cd Python-3.12.0
+
+chatGPT then instructed me to run the following commands to install python:
+
+./configure
+make
+sudo make install
+
+the 'make' command didn't work...the bash terminal response suggested I run 'sudo apt install make'
+
+The make and sudo make install command didn't work because there is no C compiler on the machine. I entered to the command below to download a C compiler
+
+sudo apt-get install -y build-essential
+
+re-ran the following commands 
+
+./configure
+make
+
+then ran the final command separately
+
+sudo make install
+
+python3 --version   <--this last piece of code is used to confirm the python installation
+
+
+
+
+
+7. Install mysql for Ubuntu
+
+Went to chatGPT for this one since the video recommends installing mysql using homebrew for Macs. 
+
+## Command to install mysql
+
+sudo apt install mysql-server
+
+During the installation, you will be prompted to set a root password for the MySQL server. I chose the matching password for the server.
+
+sql root password: [YOUR PASSWORD]
+
+
+
+
+8. Followed the code along from about the 10 minute mark as closely as possible
+
+Building the auth service
+
+Use the code below to navigate back to the auth folder if the server has any problems and has to restart
+
+cd system_design/python/src/auth
+
+Creating a virtual environment didn't go the first time, had to install venv
+
+python3 -m venv venv
+
+That still didn't work quite right due to a missing ensurepip module? Ran the code below:
+
+sudo apt-get install python3-pip
+
+Certain services needed to be restarted...ran the following command
+
+sudo systemctl restart networkd-dispatcher.service unattended-upgrades.service
+
+more frustrated debugging before i realized the problem is that the version of python is too new. 
+
+ran the following commands:
+
+sudo apt-get install python3.10
+
+python3.10 -m venv venv
+
+with success...before i joined back with the code along
+
+
+
+
+9. Following code-along (14:05)
+
+The pip install flask_mysqldb did not install within the virtual environment. 
+
+chatGPT claimed it was due to pkg-config missing
+
+ran the following command
+
+sudo apt-get install pkg-config
+
+also installed development files for mysql using the following command: 
+
+sudo apt-get install libmysqlclient-dev
+
+re-ran the pip install successfully
+
+
+
+
+10. Following code-along (22:44)
+
+Decided to go with a temp email for username and password:
+
+mirofihanaqe@rungel.net
+
+
+
+11. Following code along (23:42)
+
+Have to use sudo mysql -uroot with the password
+
+sql root password reminder: [YOUR PASSWORD]
+
+Some cool sql commands:
+
+sudo mysql -uroot + password: logs into the mysql program
+show databases; : shows the databases running on mysql
+use [database_name]; : the mysql program enters the specified database
+show tables; : shows the tables available within the database
+describe [table_name]; : provides a description of the specified table
+
+
+
+12. Following code along (28:55)
+
+I created a database from a script that is run into mysql. Sometimes I may need to rerun that script, but it can lead to errors if elements of the script are already created...so I may have to run the commands below before I rerun the script to setup the database. 
+
+sudo mysql -uroot -e "DROP USER auth_user@localhost"
+
+sudo mysql -uroot -e "DROP DATABASE auth"
+
+
+13. Following code along (44:56)
+
+The networking explanation suggests we will need to use the public ip to get to the flask website. 
+
+virtual environment reminder: source venv/bin/activate
+path file reminder: cd system_design/python/src/auth
+public ip: [PUBLIC IP ADDRESS]
+password reminder: [YOUR PASSWORD]
+
+
+14. Following code along (1:02:11)
+
+Also had to add the pkg-config package to be installed in the Dockerfile for a proper build. 
+
+The final Dockerfile for the auth app should look like this:
+
+FROM python:3.10-slim-bullseye
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends --no-install-suggests \
+  build-essential default-libmysqlclient-dev pkg-config \
+  && pip install --no-cache-dir --upgrade pip
+
+WORKDIR /app
+COPY ./requirements.txt /app
+RUN pip install --no-cache-dir --requirement /app/requirements.txt
+COPY . /app
+
+EXPOSE 5000
+
+CMD ["python3", "server.py"]
+
+
+15. Following code along (1:05:45)
+
+Had trouble pushing my image to docker bc I needed a personal access token to push from the ACloudGuru server
+
+Here are the directions to create a personal access token for Docker Hub:
+
+Generate a Personal Access Token:
+
+Go to the Docker Hub website and log in to your account.
+Navigate to your account settings.
+Under the "Security" section, find the "Access Tokens" tab.
+Click on the "Create Access Token" button.
+Provide a name and set the desired scopes (permissions) for the token.
+Click "Create."
+
+Docker access token: [DOCKER ACCESS TOKEN]
+
+
+16. Following code along (1:18:31)
+
+Lots of mistakes in my server.py file that went undetected before the docker build
+
+To rebuild the docker image I may have to run the following commands repeatedly:
+
+docker build -t [DOCKER HUB USERNAME]/auth:latest .
+docker push [DOCKER HUB USERNAME]/auth:latest
+
+
+lots of dependencies were missing from my requirements.txt file...which may be contributing to why the cluster pods aren't able to run.
+
+pip install astroid jedi lazy-object-proxy mccabe parso platformdirs pylint toml wrapt
+
+
+
+17. Following code along (1:18:31)
+
+
+New Day! Lots of hangups last night trying to get MYSQL installed from the flask_mysqldb package
+
+
+path file reminder: cd system_design/python/src/auth
+virtual environment reminder: source venv/bin/activate
+public ip: [PUBLIC IP ADDRESS]
+password reminder: [YOUR PASSWORD]
+
+Docker access token: [DOCKER ACCESS TOKEN]
+docker build -t [DOCKER HUB USERNAME]/auth:latest .
+docker push [DOCKER HUB USERNAME]/auth:latest
+
+minikube start
+cd manifests
+kubectl apply -f ./
+
+
+RUN pip install --no-cache-dir mysqlclient
+RUN pip install --no-cache-dir mysql-connector-python
+RUN pip install --pymysql
+
+
+kubectl rollout restart deployment auth
+
+
+The commands above were used in by debugging battle. As it turns out, the server.py file was altered using chatGPT to run a bit more smoothly. Once I altered the server.py file I was able to get the pods up and running. 
+
+I renamed the server.py file to server-orig.py (ran command mv server.py server-orig.py)
+
+Here is a copy of the altered server.py file:
+
+import jwt
+import datetime
+import os
+from flask import Flask, request
+from flask_mysqldb import MySQL
+
+server = Flask(__name__)
+mysql = MySQL(server)
+
+# config
+server.config["MYSQL_HOST"] = os.environ.get("MYSQL_HOST")
+server.config["MYSQL_USER"] = os.environ.get("MYSQL_USER")
+server.config["MYSQL_PASSWORD"] = os.environ.get("MYSQL_PASSWORD")
+server.config["MYSQL_DB"] = os.environ.get("MYSQL_DB")
+server.config["MYSQL_PORT"] = int(os.environ.get("MYSQL_PORT", 3306))  # Convert to int
+
+@server.route("/login", methods=["POST"])
+def login():
+    auth = request.authorization
+    if not auth:
+        return "missing credentials", 401
+
+    # check db for username and password
+    cur = mysql.connection.cursor()
+    res = cur.execute("SELECT email, password FROM user WHERE email=%s", (auth.username,))
+
+    if res > 0:
+        user_row = cur.fetchone()
+        email = user_row[0]
+        password = user_row[1]
+
+        if auth.username != email or auth.password != password:
+            return "invalid credentials", 401
+        else:
+            return create_jwt(auth.username, os.environ.get("JWT_SECRET"), True)
+    else:
+        return "invalid credentials", 401
+
+@server.route("/validate", methods=["POST"])  # Corrected method to methods
+def validate():
+    encoded_jwt = request.headers.get("Authorization")  # Use get to avoid KeyError
+
+    if not encoded_jwt:
+        return "missing credentials", 401
+
+    encoded_jwt = encoded_jwt.split(" ")[1]
+
+    try:
+        decoded = jwt.decode(
+            encoded_jwt, os.environ.get("JWT_SECRET"), algorithms=["HS256"]
+        )  # Corrected algorithm to algorithms
+    except jwt.ExpiredSignatureError:
+        return "Token has expired", 401
+    except jwt.InvalidTokenError:
+        return "Invalid token", 401
+
+    return decoded, 200
+
+
+def create_jwt(username, secret, authz):
+    return jwt.encode(
+        {
+            "username": username,
+            "exp": datetime.datetime.now(tz=datetime.timezone.utc)
+            + datetime.timedelta(days=1),
+            "iat": datetime.datetime.utcnow(),
+            "admin": authz,
+        },
+        secret,
+        algorithm="HS256",
+    )
+
+
+if __name__ == "__main__":
+    server.run(host="0.0.0.0", port=5000)
+
+
+
+
+17. Following code along (1:18:31)
+
+
+New Day! Relaxing day off and now it's back to work!
+
+
+path file reminder: cd system_design/python/src/auth
+virtual environment reminder: source venv/bin/activate
+public ip: 3.101.131.111
+password reminder: [YOUR PASSWORD]
+
+Docker access token: [DOCKER ACCESS TOKEN]
+docker build -t [DOCKER HUB USERNAME]/auth:latest .
+docker push [DOCKER HUB USERNAME]/auth:latest
+
+minikube start
+cd manifests
+kubectl apply -f ./
+
+
+
+18. Following code along (1:36:06)
+
+Starting to work on the API Gateway service now that the authentication pods are up and running. Having similar issues with setting up a virtual environment as I did with the auth service in step 8. Copied and pasted the solution steps from step 8 and followed the instructions to fix the problem.
+
+Creating a virtual environment didn't go the first time, had to install venv
+
+python3 -m venv venv
+
+That still didn't work quite right due to a missing ensurepip module? Ran the code below:
+
+sudo apt-get install python3-pip
+
+Certain services needed to be restarted...ran the following command
+
+sudo systemctl restart networkd-dispatcher.service unattended-upgrades.service
+
+more frustrated debugging before i realized the problem is that the version of python is too new. 
+
+ran the following commands:
+
+sudo apt-get install python3.10
+
+python3.10 -m venv venv
+
+with success...before i joined back with the code along
+
+
+
+17. Following code along (2:43:23)
+
+
+Returning to work after a break...got the kubernetes deployment of the API gateway up an running...but it can't function properly yet until a RabbitMQ service is set up.
+
+
+path file reminder: cd system_design/python/src/auth
+virtual environment reminder: source venv/bin/activate
+public ip: 3.101.131.111
+password reminder: [YOUR PASSWORD]
+
+Docker access token: [DOCKER ACCESS TOKEN]
+docker build -t [DOCKER HUB USERNAME]/gateway:latest .
+docker push [DOCKER HUB USERNAME]/gateway:latest
+
+minikube start
+cd manifests
+kubectl apply -f ./
+
+
+
+18. Following code along (3:03:09)
+
+Got the rabbitMQ service up and running. This part of the code along presumes that the work was done on a local machine, so the presenter is able to pull up the rabbitMQ site through a browser after mapping 127.0.0.1 to a domain name. I'm going to see if I can use SSH tunneling to basically have the remote machine forward me the localhost and port traffic to my local machine. The command used is below. Here goes nothing!
+
+ssh -L 15672:127.0.0.1:15672 cloud_user@54.219.91.74
+
+Didn't work...worth a shot but localhost rules are really strict. One idea to try is to use a remote viewer like tightVNC to view a remote desktop and to gain access that way. I think I'll be satisfied if my gateway service is up and running along with the rabbitmq service and auth service so far for the sake of this project.
+
+Had to correct a typo in the api gateway configuration. Trying the code below
+
+
+19. Following code along (3:36:42)
+
+Finished the converter service. Unfortunately, the converter pods weren't able to run because they are directly dependent on the rabbitmq pod working with a functioning queue so that the converter pods can connect to that queue service.
+
+docker build -t [DOCKER HUB USERNAME]/converter:latest .
+docker push [DOCKER HUB USERNAME]/converter:latest
+kubectl rollout restart deployment converter
+
+Trying a think-outside-the-box approach to not being able to access the rabbitmq console. Using kubectl exec command to enter the kubernetes pod, and then using the pod's bash shell and a rabbitmq admin tool to try and set up a rabbitmq queue. Relevant code is below.
+
+apt-get update
+apt-get install -y python3
+apt-get install -y curl
+
+to check if rabbitmq is already in the pod (and it should be):
+which rabbitmqadmin
+
+if it isn't then run this code:
+curl -LO https://github.com/rabbitmq/rabbitmq-management/raw/main/bin/rabbitmqadmin
+chmod +x rabbitmqadmin
+
+/usr/local/bin/rabbitmqadmin declare queue name=video durable=true
+/usr/local/bin/rabbitmqadmin declare queue name=mp3 durable=true
+
+This strategy appears to have worked!
+
+I decided to forego the testing of the service. I'm ok with the containers running and gaining an understanding of rabbitmq, mongodb, python backend, api gateways, kubernetes and docker
+
+
+
+20. Wrapping it all up!
+
+Built a notification service that acts to automatically send an email when a rabbitmq message is received that indicates that the conversion has taken place.
+
+path file reminder: cd system_design/python/src/auth
+virtual environment reminder: source venv/bin/activate
+public ip: 3.101.131.111
+password reminder: [YOUR PASSWORD]
+
+Docker access token: [DOCKER ACCESS TOKEN]
+docker build -t [DOCKER HUB USERNAME]/notification:latest .
+docker push [DOCKER HUB USERNAME]/notification:latest
+
+minikube start
+cd manifests
+kubectl apply -f ./
+
+kubectl rollout restart deployment notification
+
+pushing my project to github using the following commands:
+
+cd ~/system_design
+git init
+
+git remote add origin https://github.com/m-adeleke1/LinkedIn.git
+
+git add .
+git commit -m "freeCodeCamp Microservices Architecture completed project"
+git push -u origin master
+
+github access token: [GITHUB ACCESS TOKEN]
+
