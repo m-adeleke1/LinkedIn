@@ -1,0 +1,214 @@
+Today I'm going to experiment with APM by trying to install DataDog on a spun up ACloudGuru Server. I'll be using the instructions from Ibukun Itimi's course on DataDog. 
+
+This should be an interesting challenge. On the one hand I can try to open an AWS sandbox and clone the repo for the application onto CloudFormation...but I may need access to a browser on the same machine to use DataDog...on the other hand I can use a plain Ubuntu server to install the packages and run DataDog, but again, no access to the desktop and a browser. 
+
+
+1. Navigated to the site below
+
+https://www.datadoghq.com/
+
+and registered for a free trial:
+
+email: [YOUR_EMAIL]
+password: [YOUR_PASSWORD]
+
+Filled out the required information and signed up. Easy process!
+
+
+2. Spun up an ACloudGuru server using the following information. Winging it here.
+
+Distribution: Amazon Linux 2
+Zone: North America
+Size: Medium
+Tag: DataDog Server
+
+
+Username: [YOUR_SERVER_USERNAME]
+Password: [YOUR_SERVER_PASSWORD]
+
+Public IP: [YOUR_SERVER_PUBLIC_IP]
+Private IP: [YOUR_SERVER_PRIVATE_IP]
+IPv6: [YOUR_SERVER_IPV6]
+
+The server has aws pre-installed which is good stuff.
+
+3. Started an ACloudGuru AWS sandbox
+
+Username: [YOUR_SERVER_USERNAME]
+Password: [YOUR_SANDBOX_PASSWORD]
+URL: [YOUR_SANDBOX_SIGNIN]
+Access Key ID: [YOUR_SANDBOX_ACCESS_KEY]
+Secret Access Key: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+
+4. Typed 'aws configure' into the Amazon Linux 2 machine. Answered the prompts as shown below:
+
+[[YOUR_SERVER_USERNAME]@[YOUR_SERVER_HOSTNAME] ~]$ aws configure
+AWS Access Key ID [None]: [YOUR_SANDBOX_ACCESS_KEY]
+AWS Secret Access Key [None]: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+Default region name [None]: [YOUR_SANDBOX_REGION]
+Default output format [None]: [YOUR_SANDBOX_OUTPUT]
+
+5. Entered 'sudo yum update' into the Amazon Linux 2 machine. Provided my Amazon Linux 2 password. Entered 'y' for one prompt. Waited until the terminal read 'Complete!'
+
+Went back to the DataDog site where I am signed in using the URL below. Clicked on Amazon Linux and followed the instructions to install DataDog on the spun up Amazon Linux 2 machine.
+
+https://us5.datadoghq.com/signup/agent#aws
+
+Copied and pasted the code below into the Amazon Linux 2 machine.
+
+DD_API_KEY=6a28cdf808a49ff15edb112d35a65c41 DD_SITE="us5.datadoghq.com" bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script_agent7.sh)"
+
+
+6. The following directions are from Ibunku's 'What is infrastructure monitoring?' video at minute 1:17 of the Monitoring and Observability with DataDog course on LinkedIn Learning. I will be referring to this course throughout the rest of the instructions as the DataDog Course. The features look a bit different than the instructional video so I skipped over the portion of the video that explained the DataDog products that are to be selected by presuming that they matched the default products in the video.
+
+I'm currently at the Quick Start page for Data Dog. Scrolled to integrations. Typed 'AWS' in the search bar, and click on the blue '+Install' button for the AWS search result. Clicked on 'Add AWS Account' and then made sure that 'Add a Single AWS Account' was highlighted at the top of the page. I clicked on the button under step 2 to add a default API key associated with my DataDog account. I clicked on 'Launch CloudFormation Template'. I clicked on IAM user, took the portion of the AWS sandbox username that correlates to the AWS account number and pasted it into the text box, and clicked 'Next'. Entered the credentials for the AWS sandbox username and password and signed in. The cloudformation template appeared on the screen. I went ahead and clicked on Create Stack.
+
+
+7. I have had difficulty getting the node.js application that was offered in the LinkedIn video to function properly due to MongoDB Atlas configuration challenges and restrictions. I decided to try a new application today that is a bit simpler and uses MySQL. The aim of the project is to generate traffic to see how DataDog responds...app provisioning and building apps are separate challenges for another day.
+
+https://github.com/fazt/nodejs-mysql-links.git
+
+I went ahead and provisioned a t2.micro instance through the EC2 console. ADJUST THE ATTACHED VOLUME TO 24GB. I typed 'EC2' in the search bar and opened the EC2 result in a separate tab, then clicked on 'Launch Instance'. I entered 'DataDog Server' as the name. and scrolled down to 'Create a new key pair' to create one. I created an RSA .pem key pair (.pem is used for Linux and MAC, .ppk is used for Windows...and it may involve using Putty...research for more details) named DataDog. I decided to allow HTTP and HTTPS traffic so that the node.js application should work (checked the boxes). Everything else I left as default and clicked on 'Launch Instance'.
+
+
+8. I'm trying to copy the .pem file (which auto-downloaded to my windows machine) to the AWS instance using a bash terminal in Visual Studio code. Navigated to the default downloads folder in the bash terminal through VS code and used the following command to send a copy of the .pem file to the Amazon Linux 2 machine after I tried to ssh into the instance from my local machine as a test (which worked). I then adjusted the file permissions on the .pem file and was able to ssh into the machine from the Amazon Linux 2 instance.
+
+
+(using a bash terminal on my local machine)
+scp -i DataDog.pem DataDog.pem [YOUR_SERVER_USERNAME]@[YOUR_SERVER_PUBLIC_IP]:~
+
+
+(code from the Amazon Linux 2 instance - the 'ls' command is to confirm the presence of the DataDog.pem file on the Amazon Linux 2 instance)
+ls
+chmod 400 DataDog.pem
+ssh -i DataDog.pem ec2-user@[YOUR_SERVER_PUBLIC_IP]
+   ,     #_
+   ~\_  ####_        Amazon Linux 2023
+  ~~  \_#####\
+  ~~     \###|
+  ~~       \#/ ___   https://aws.amazon.com/linux/amazon-linux-2023
+   ~~       V~' '->
+    ~~~         /
+      ~~._.   _/
+         _/ _/
+       _/m/'
+Last login: Thu Feb  1 15:03:46 2024 from 136.54.59.75
+[ec2-user@ip-172-31-30-247 ~]$ 
+
+
+9. I tried to install a node.js application that was offered from a github repo that was presented in the datadog video course but I couldn't get it to to work. {MODIFICATION} maybe I actually did? It took up all of my sandbox time but I think I got it working. Here is the full code for what I did: 
+
+chmod -R +rX nodejs-mysql-links
+scp -r -i DataDog.pem nodejs-mysql-links ec2-user@[YOUR_SERVER_PUBLIC_IP]:~
+ssh -i DataDog.pem ec2-user@[YOUR_SERVER_PUBLIC_IP]
+chmod -R +rX nodejs-mysql-links
+sudo chown -R ec2-user:ec2-user /home/ec2-user/nodejs-mysql-links
+
+DON'T FORGET TO ADD PORTS 4000, 8080 TO THE SECURITY GROUP OF THE EC2 INSTANCE
+
+- I installed updates with the 'sudo yum update' command
+
+- I installed Git with the 'sudo yum install git' command
+
+- I cloned the repo using the 'sudo git clone https://github.com/fazt/nodejs-mysql-links.git' command
+- I changed the directory to the cloned git folder using the 'cd nodejs-mysql-links' command
+
+- I installed Docker using the 'sudo yum install docker' command. 
+
+- I then installed docker-compose using the following commands one at a time:
+
+sudo systemctl start docker
+sudo usermod -aG docker $USER
+sudo systemctl restart docker
+
+
+- I installed nvm which is a node.js installer that can install the latest version of node.js using the code below one line at a time:
+
+[MODIFIED]
+try:
+sudo yum install -y nodejs
+
+
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+source ~/.bashrc
+nvm install --lts
+nvm alias default <version>
+
+
+- I then used the command 'sudo nano Dockerfile' to change the version at the top of the file to the latest version of node.js that was downloaded. 
+
+- I finally used the following commands to install docker-build and properly build the docker image and to get the app running
+
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose --version
+
+sudo docker-compose build
+sudo docker-compose up
+
+TROUBLESHOOTING:
+sudo rm -rf node_modules
+sudo rm package-lock.[YOUR_SANDBOX_OUTPUT]
+
+[MODIFIED]: skip this next step
+nvm alias default 20
+sudo nano Dockerfile --> Change version
+sudo docker restart linksweb linksdb
+sudo chmod +rx /var/lib/docker/overlay2
+
+
+10. Alright, after 2 days of fiddling I finally got a nodejs application up and running and monitored by DataDog. Learned some linux along the way which was nice. I picked back up at minute 3:20 of the video Understanding DataDog metrics of the DataDog course video.
+
+I ran the following commands
+
+sudo systemctl status datadog-agent - This command confirms that the datadog agent is running on your host or substitute host machine
+
+cd /etc/datadog-agent - This command moves into an etc file where the config file for datadog is located (datadog.yaml). Uncommenting various parameters in the file will lead to datadog collecting the relevant metrics. 
+
+sudo nano datadog.yaml - This command is to open up the config file in a text editor to edit the metrics that the user wants collected. Use the documentation to search for metrics
+
+
+I searched for process config (use F6 key to search in nano text editor if you are using a windows machine) and searched for process_config: and hit enter. I uncommented the parameter and the enabled: false about 7 lines below, and changed it to enabled: true.
+
+finally, run the command sudo systemctl restart datadog-agent
+
+
+11. You have to download the datadog agent separately on the EC2 instance. This step is necessarily repeatable. I went to Integrations --> Agent on the DataDog site, copied the link for Amazon Linux 2 (I am using the same type of OS on the EC2 instance) and pasted it in a window where I am ssh'ed into the instance. Pretty neat stuff..I repeated the steps above to enable being able to view processes on my instance and I was able to find the docker container running the node.js app. Alright my sandbox time is about up for tonight. Tomorrow I'll re-do the setup (which is good for linux practice anyway) and try to set up APM. See if you can enable both trace and runtime metrics tomorrow.
+
+In the meantime there is some documentation I can read:
+
+https://docs.datadoghq.com/tracing/trace_collection/#automatic-instrumentation
+https://docs.datadoghq.com/tracing/trace_collection/automatic_instrumentation/dd_libraries/nodejs/
+https://docs.datadoghq.com/tracing/trace_collection/compatibility/nodejs/
+https://docs.datadoghq.com/tracing/metrics/runtime_metrics/
+
+
+Preparation steps after the datadog agent is installed on the EC2 instance:
+
+enable trace metrics:
+
+- sudo chown -R $(whoami) ~/.npm
+- sudo chown -R $(whoami) /usr/lib/node_modules
+- npm install dd-trace --save 
+[MODIFIED]: try the code above, ignore the code below
+* Since I used nvm to install node.js, I needed to use a slight code alteration due to permissions issues:
+npm config delete proxy
+npm config delete https-proxy
+sudo ~/.nvm/versions/node/v20.11.0/bin/node ~/.nvm/versions/node/v20.11.0/bin/npm install -g dd-trace
+
+
+- node --require dd-trace/init app.js
+
+if you run into any issues, you can try a single step apm install through docker with this approach which is in beta:
+
+https://docs.datadoghq.com/tracing/trace_collection/automatic_instrumentation/single-step-apm/?tab=docker
+
+
+enable runtime metrics:
+
+add these environment variables...just paste them in bash:
+
+export DD_RUNTIME_METRICS_ENABLED=true
+export DD_ENV=prod
+export DD_SERVICE=my-web-app
+export DD_VERSION=1.0.3
