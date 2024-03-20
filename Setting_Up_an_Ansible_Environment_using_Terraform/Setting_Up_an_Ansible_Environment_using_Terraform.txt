@@ -1,0 +1,119 @@
+Ok so...my notes on the last coding project was bad because I didn't even expect to get as far as I did. I was basically experimenting with ChatGPT to see if it could help me set up a VPC with some subnets, EC2 instances and a bastion host. So today I'll try to do better with the coding notes. A special thanks to Gineesh Madapparambath for helping to set up this lab.
+
+
+References:
+
+https://www.techbeatly.com/use-terraform-to-create-a-free-ansible-lab-in-aws/
+
+
+-NOTE: It is assumed that Terraform is already downloaded on your machine. If it is not downloaded, them simply google 'Terraform download' and follow the instructions.
+
+
+
+1. Launched an ACloudGuru server. 
+
+Username: cloud_user
+Password: [YOUR_SERVER_PASSWORD]
+
+Public IP: [YOUR_SERVER_PUBLIC_IP]
+Private IP: [YOUR_SERVER_PRIVATE_IP]
+IPv6: [YOUR_SERVER_IPv6]
+
+
+2. Set up an ACloudGuru AWS Sandbox.
+
+Username:          cloud_user
+Password:          [YOUR_SANDBOX_PASSWORD]
+URL:               [YOUR_SANDBOX_URL]
+Access Key ID:     [YOUR_SANDBOX_ACCESS_KEY_ID]
+Secret Access Key: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+
+
+3. Entered the 'aws configure' command to change the AWS credentials
+
+
+[[YOUR_SERVER_USERNAME]@[YOUR_SERVER_HOSTNAME] ~]$ aws configure
+AWS Access Key ID [****************66GI]: [YOUR_SANDBOX_ACCESS_KEY_ID]
+AWS Secret Access Key [****************MdIt]: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+Default region name [[CHOOSE_AN_AWS_REGION]]: [CHOOSE_AN_AWS_REGION]
+Default output format [json]: json
+
+
+4. Cloned the repository below to the ACloudGuru server.
+
+git clone https://github.com/ginigangadharan/terraform-iac-usecases
+
+
+5. Confirmed that the credentials were properly in place using the 'cat ~/.aws/credentials' command
+
+[[YOUR_SERVER_USERNAME]@[YOUR_SERVER_HOSTNAME] terraform-iac-usecases]$ cat ~/.aws/credentials
+[default]
+aws_access_key_id = [YOUR_SANDBOX_ACCESS_KEY_ID]
+aws_secret_access_key = [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+
+
+6. The example in the reference website looked like it did below, so I'm going to use the vim editor on the credentials file to add the proper changes.
+
+cat ~/.aws/credentials 
+[default]
+aws_access_key_id=AKIA5WGDZFEXAMPLEKEY
+aws_secret_access_key=Wb1v7OXMMYNRlNYXOGK5sPxZEXAMPLEACCESSKEY
+
+[ansible]
+aws_access_key_id=AKIA5WGDZFEXAMPLEKEY
+aws_secret_access_key=Wb1v7OXMMYNRlNYXOGK5sPxZEXAMPLEACCESSKEY
+
+
+7. Confirmed that the config file was properly in place using the 'cat ~/.aws/config' command
+
+[[YOUR_SERVER_USERNAME]@[YOUR_SERVER_HOSTNAME] terraform-iac-usecases]$ cat ~/.aws/config
+[default]
+output = json
+region = [CHOOSE_AN_AWS_REGION]
+
+
+8. Checked if there is an id_rsa file within a .ssh folder according to the reference site by using the '~/.ssh/id_rsa' command. There was none on my machine, so I went ahead and migrated back to the home folder before I input the 'ssh-keygen' command.
+
+[[YOUR_SERVER_USERNAME]@[YOUR_SERVER_HOSTNAME] terraform-iac-usecases]$ cd ~
+[[YOUR_SERVER_USERNAME]@[YOUR_SERVER_HOSTNAME] ~]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/[YOUR_SERVER_HOSTNAME]/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/[YOUR_SERVER_HOSTNAME]/.ssh/id_rsa.
+Your public key has been saved in /home/[YOUR_SERVER_HOSTNAME]/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:NaXD8qQarlImE7nZ65hzfQsUbMfopcooZQmUDX1xxU4 [YOUR_SERVER_USERNAME]@[YOUR_SERVER_DNS_NAME]
+The key's randomart image is:
++---[RSA 2048]----+
+| o=  ...o.  .    |
+|.. o o.o E o     |
+|.  .. = B B      |
+| .o. o = B o     |
+|  +=  = S .      |
+| o=o++ o         |
+|. .=oo+          |
+| .ooo....        |
+|  o=o  ...       |
++----[SHA256]-----+
+
+
+9. Used the terraform sequence of commands (terraform init, terraform plan, and terraform apply) and crossed my fingers. 
+
+10. Realized that the folder was empty. I went to the link in a browser and it showed that there is an alternate link that is now being used to contain the repo. So I removed the folder that was cloned, cloned the new repository using the link below, and then repeated step 9. 
+
+https://github.com/iamgini/terraform-iac-usecases
+
+The terraform didn't init again, but this time, I believe it is because there are multiple options for the user to select from. I decided to migrate to the 'terraform-aws-ansible-lab' folder because it's contents seem to most closely resemble what was in the description. I inspected the main.tf file and noticed that the defauly region for the config file was asia pacific southeast 1 (ap-southeast-1), so I decided to switch it to [CHOOSE_AN_AWS_REGION]. After reading the README file, I confirmed that it was an ok decision. I also learned in the README that I can uncomment commands to 'sudo yum -y update' the nodes, which I went ahead and did.
+
+11. After terraform init and terraform plan worked, terraform apply ran into an error stating that the image ID for the t2.micro instance does not exist. I went to the console to check for the current image ID for the t2.micro instance and replaced the values with the Amazon Linux 2023 AMI. I substituted the value in the variables.tf file for the folder. A 'terraform plan' command confirmed that the change was made.
+
+old t2.micro image id: ami-02f26adf094f51167
+new t2.micro image id: ami-0d7a109bf30624c99
+
+
+12. Success! Terraform was able to add the proper EC2 instances to the AWS account. I now have a basis for implementing an Ansible environment into an ACloudGuru sandbox environment so that I can practice and get good at using Ansible. There are also other ansible environments that I can explore thanks to the improved GitHub repo. Again, a special thanks to Gineesh Madapparambath for helping out!
+
+
+
+
