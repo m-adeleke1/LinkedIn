@@ -1,0 +1,444 @@
+A special thanks to Rahul Wagh for this project. This is a massive, production-level piece of work. I'm hoping that I can comment out the Route53 stuff and just point Terraform to his DNS setup, change the regions to us-east-1, etc...but it's a great project for learning Terraform on the fly. Also a special thanks to Amod Kadam for providing a clear explanation of how to do a variation of the project.
+
+
+Reference Websites:
+
+https://www.youtube.com/watch?v=otQqd7GRVK0&t=13s
+
+https://github.com/rahulwagh/terraform-jenkins (Terraform Jenkins)
+https://github.com/rahulwagh/devops-project-1 (Flask Application)
+
+https://amod-kadam.medium.com/create-private-ca-and-certificates-using-terraform-4b0be8d1e86d
+
+
+
+**If you are starting at the very beginning, then start with Step 1. further below...skip over these steps [ 1), 2), 3) etc. ] and come back to these before you deploy the jenkins machine -- you can return here prior to Step 16. -- Step 2) partially reiterates what I did in Step 16. for example)
+
+
+
+
+Things you must do prior to runtime of the first terraform project:
+
+1) Type 'aws configure' into the command line to change the credentials to the current sandbox values. Make sure to confirm that the [default] entries in the file at ~/.aws/credentials match the values that you entered. You should also do this on the Jenkins EC2 machine once it is setup (after you install aws onto the machine...I was surprised to learn that aws is not a default install on EC2 hosts!) but I will go over this again later in the instructions. Returning focus to the terraform-jenkins folder, delete the terraform.tfstate and terraform.tfstate.backup files in both the terraform-jenkins folder and flask-application folder by running the command below:
+
+rm terraform.tfstate terraform.tfstate.backup
+
+
+2) Comment out everything below the networking module for the first terraform run in order to create the relevant VPC within the AWS account.
+Create a hosted zone in your AWS sandbox with the domain name 'jhooq.org' (or whichever name you wish, as long as you reference it in the data block of the main.tf file in the hosted-zone folder). Make sure to associate the hosted zone with the correct VPC that should have been created in the first Terraform run. If you want to keep things in the free tier, then use a private hosted zone. If you do decide to go ahead and use a private hosted zone, then there are separate steps that need to be taken which will be explained in detail at the bottom of this file. Make sure the values in the hosted-zone files within the terraform code match your hosted zone input, then uncomment the relevant modules in the main.tf file and re-initialize/re-run the terraform.
+
+
+3) Comment out the contents of the remote_backend_s3.tf file. That file presumes that the tf state file is still present in the remote s3 bucket of the project creator...so uncomment it in order to initialize the terraform file properly. Also, I made the following changes to the project after an error in my initial terraform plan run:
+
+terraform.tfvars file:
+name = (copy of the string for bucket_name)
+
+variables.tf file:
+variable "name" {
+  description = "A descriptive name for the S3 bucket"
+}
+
+Also, very important, replace the bucket name that is used in the project to a unique bucket name so that the terraform can create them. In my project, I am just trying to reverse the numbers to see if that works. If it does work, then they should be available again since I am using a sandbox environment. Make sure to run the code below at the folder hierarchy level that includes both the terraform-jenkins folder and the flask-application folder (in my case it was the real-time-devops folder). Also, if you are using a different ssh key name than the key that the project creator mentioned in the video, be sure to replace that filename as well (I believe the project creator mentioned a key name in the instructions that was different than a key name that he was comfortable using -- in my case I went ahead and replaced the key name to the one that was explicitly mentioned in the setup):
+
+find . -type f -exec sed -i 's/dev-proj-1-jenkins-remote-state-bucket-123456/YOUR_BUCKET_NAME_FOR_THE_TERRAFORM_JENKINS_PROJECT/g' {} +
+find . -type f -exec sed -i 's/dev-proj-1-remote-state-bucket-123456/YOUR_BUCKET_NAME_FOR_THE_FLASK_APPLICATION_PROJECT/g' {} +
+
+find . -type f -exec sed -i 's/aws_ec2_terraform/jenkins_demo/g' {} +
+
+If things go haywire then set up the s3 bucket manually in your AWS account. Here are the details:
+
+(~1:20:40)
+
+Bucket 1:
+
+name: dev-proj-1-jenkins-remote-state-bucket-123456
+region: us-east-1
+access: bucket and objects not public
+
+Bucket 2:
+
+name: dev-proj-1-remote-state-bucket-123456
+region: us-west-1
+access: bucket and objects not public
+
+
+4) Be sure to change the value for the ubuntu ami image ID, again at the folder level that contains both the terraform-jenkins folder and the flask application folder. The image id can change often, so make sure to check the image id for the current ubuntu image by doing the following: Go to the EC2 section in your AWS account (make sure you are in the AWS region where you want to deploy the instance...the AMI ID for the same OS will have a different ID in different regions), click the 'Launch Instance' yellow button, and then scroll down and click on the 'Ubuntu' button within the 'Application and OS Images' section. Copy the value in the AMI ID section in order to run the code below effectively.
+
+
+find . -type f -exec sed -i 's/ami-0694d931cee176e7d/THE CURRENT AMI ID FOR THE UBUNTU IMAGE/g' {} +
+
+
+
+
+
+
+
+
+
+This is a cool looking project that sets up jenkins in AWS by using Terraform (the main reason why I'm doing this project) but it also sets up a nice VPC environment. 
+
+
+1. Launched an ACloudGuru server. 
+
+Username: [SERVER_USERNAME]
+Password: [SERVER_PASSWORD]
+
+Public IP: [SERVER_PUBLIC_IP]
+Private IP: [SERVER_PRIVATE_IP]
+IPv6: [SERVER_IPv6_ADDRESS] 
+
+
+
+2. Made a directory folder for the entire project
+
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] ~]$ mkdir real-time-devops
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] ~]$ ls
+real-time-devops
+
+
+3. Changed the directory to the new folder and cloned the first repository related to the project
+
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] ~]$ cd real-time-devops
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ git clone https://github.com/rahulwagh/terraform-jenkins
+Cloning into 'terraform-jenkins'...
+remote: Enumerating objects: 47, done.
+remote: Counting objects: 100% (47/47), done.
+remote: Compressing objects: 100% (24/24), done.
+remote: Total 47 (delta 11), reused 41 (delta 8), pack-reused 0
+Receiving objects: 100% (47/47), 8.84 KiB | 1.77 MiB/s, done.
+Resolving deltas: 100% (11/11), done.
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ ls
+terraform-jenkins
+
+
+4. Changed the directory to the new terraform-jenkins folder and ran the following commands to change the regions: 
+
+find . -type f -exec sed -i 's/eu_central/us_east/g' {} +
+find . -type f -exec sed -i 's/eu_west/us_east/g' {} +
+find . -type f -exec sed -i 's/eu-central/us-east/g' {} +
+find . -type f -exec sed -i 's/eu-west/us-east/g' {} +
+find . -type f -exec sed -i 's/eu_/us_/g' {} +
+find . -type f -exec sed -i 's/eu-/us-/g' {} +
+
+Here is a breakdown of the command from ChatGPT:
+
+
+Sure, let's break down the command:
+
+find . -type f: This part of the command initiates the find command, which is used to search for files and directories. Here:
+
+.: Specifies the current directory as the starting point for the search.
+-type f: Specifies that only files should be considered in the search (not directories).
+-exec sed -i 's/eu_central/us_east/g' {} +: This part of the command tells find to execute the sed command for each file found:
+
+-exec: This option allows you to execute a command for each found file.
+sed: This is the stream editor command used for text manipulation.
+-i: This option tells sed to edit files in place, meaning it will directly modify the files rather than writing the output to the terminal.
+'s/eu_central/us_east/g': This is the substitution command for sed. It uses the syntax s/pattern/replacement/g, where:
+s: Indicates that it's a substitution operation.
+eu_central: The pattern to search for.
+us_east: The replacement text.
+g: This flag stands for global, meaning it will replace all occurrences of the pattern in each line. Without the g, only the first occurrence in each line would be replaced.
+{}: Represents the current file being processed by find.
++: This tells find to combine multiple files into a single command line, which can improve efficiency by reducing the number of times sed is executed.
+
+
+REMEMBER TO REPEAT STEP 4 FOR ALL CLONED REPOSITORIES RELATING TO THIS PROJECT...BUT MAKE SURE TO CHANGE THE VALUES OF THE APPLICATION FROM EU-CENTRAL TO US-WEST OR A DIFFERENT REGION OF YOUR CHOICE (IT IS PURPOSEFULLY SET TO A DIFFERENT REGION -- ~14:25)
+
+
+5. Changed the aws credentials directory in the provider.tf file (~12:48) to the following for my machine: "/home/[SERVER_USERNAME]/.aws/credentials"
+
+
+6. Typed 'ssh-keygen' into the command-line and named it 'jenkins_demo' and left the passphrases blank
+
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/[SERVER_USERNAME]/.ssh/id_rsa): /home/[SERVER_USERNAME]/.ssh/jenkins_demo
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/[SERVER_USERNAME]/.ssh/jenkins_demo.
+Your public key has been saved in /home/[SERVER_USERNAME]/.ssh/jenkins_demo.pub.
+The key fingerprint is:
+SHA256:nPmFMVwY1wzndI2V7DNuhx56iIcOx4SImCVFtlgV9/Y [SERVER_USERNAME]@[SERVER_HOSTNAME].mylabserver.com
+The key's randomart image is:
++---[RSA 2048]----+
+|   .=.o.. .o+++o=|
+|   = . . o.o +++.|
+|  o o     *   o  |
+|   = . o = =   + |
+|  o . . S o E ..o|
+|         + .  oo.|
+|        . +o +...|
+|         oo + o  |
+|         ... .   |
++----[SHA256]-----+
+
+
+
+7. Entered 'cat /home/[SERVER_USERNAME]/.ssh/jenkins_demo.pub' into the command line. Copied the output of the command to the public key variable in the terraform.tfvars file.
+
+
+8. Changed the portion of the hosted-zone main.tf file that deals with a private hosted zone to true (line 7) in order to try to keep things in the free tier. A public hosted zone requires a unique domain name (which has to be purchased). The domain name in the private hosted zone does not have to be unique, so I left the default values...I'll just be using the ip address of the load balancer to get to the jenkins server. For the rest of the project, I'll be using the public ip of the load balancer in place of the domain name that was referenced.
+
+
+
+9. Created a folder called flask-application, and then cloned the git repo for the flask application from the website below
+
+https://github.com/rahulwagh/devops-project-1
+
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] ~]$ cd real-time-devops
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ ls
+terraform-jenkins
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ mkdir flask-application
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ ls
+flask-application  terraform-jenkins
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] real-time-devops]$ cd flask-application
+[[SERVER_USERNAME]@[SERVER_HOSTNAME] flask-application]$ git clone https://github.com/rahulwagh/devops-project-1
+Cloning into 'devops-project-1'...
+remote: Enumerating objects: 234, done.
+remote: Counting objects: 100% (69/69), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 234 (delta 66), reused 65 (delta 65), pack-reused 165
+Receiving objects: 100% (234/234), 26.89 KiB | 2.44 MiB/s, done.
+Resolving deltas: 100% (116/116), done.
+
+
+
+10. Changed the directory to the new flask-application folder and ran the following commands to change the regions:
+NOTICE I CHOSE us-west-2 THIS TIME. THE APP AND THE JENKINS SERVER ARE MEANT TO BE IN DIFFERENT REGIONS.
+
+find . -type f -exec sed -i 's/eu_central/us_west/g' {} +
+find . -type f -exec sed -i 's/eu_west/us_west/g' {} +
+find . -type f -exec sed -i 's/eu-central/us-west/g' {} +
+find . -type f -exec sed -i 's/eu-west/us-west/g' {} +
+find . -type f -exec sed -i 's/west-1/west-2/g' {} +
+find . -type f -exec sed -i 's/west_1/west_2/g' {} +
+find . -type f -exec sed -i 's/eu_/us_/g' {} +
+find . -type f -exec sed -i 's/eu-/us-/g' {} +
+
+
+
+11. Changed the directory to the new flask-application folder and ran the following commands to change file names from 'apache' to 'python' just to be precise:
+
+find . -type f -exec sed -i 's/apache/python/g' {} +
+find . -type f -exec sed -i 's/Apache/Python/g' {} +
+
+
+
+12. Entered 'cat /home/[SERVER_USERNAME]/.ssh/jenkins_demo.pub' into the command line. Copied the output of the command to the public key variable in the terraform.tfvars file.
+
+
+
+13. Changed the portion of the hosted-zone main.tf file that deals with a private hosted zone to true (line 7) in order to try to keep things in the free tier. A public hosted zone requires a unique domain name (which has to be purchased). The domain name in the private hosted zone does not have to be unique, so I left the default values...I'll just be using the ip address of the load balancer to get to the jenkins server. For the rest of the project, I'll be using the public ip of the load balancer in place of the domain name that was referenced.
+
+
+14. Found a typo around ~1:19:15. I'm not sure if that needs to be spelled correctly since it's the name of a terraform module. I took no chances.
+
+find . -type f -exec sed -i 's/ceritification/certification/g' {} +
+
+
+15. I adjusted the code of both the terraform-jenkins main.tf to create the s3 bucket for a remote backend storage of the terraform state file using terraform...in the video, the project creator discusses creating the buckets manually for storage of the state files. I added the code below at the very top of the main.tf file:
+
+module "s3" {
+  source      = "./s3"
+  bucket_name = var.bucket_name
+  name        = var.name
+  environment = var.bucket_name
+}
+
+
+make sure that the setups are very similar for both the terraform-jenkins folder and the flask-application folder regarding the s3 module within the main.tf file, the s3 folder's main.tf file (I believe the s3 folder did not exist for one of the projects...so I had to copy the folder from the other project and paste it in the project with the missing folder), and make sure the variables are adjusted accordingly in the relevant variables.tf and terraform.tfvars files if needed. 
+
+
+16. I went into the terraform main.tf file within the Terraform-Jenkins folder, and I commented out everything in the code below the networking module with a "/*" beneath the networking module (and above the next module) and a "*/" at the end of the file. I then saved the main.tf file and did the whole terraform init, terraform plan, terraform apply routine. I then went to the console, typed in Route 53, and then created a private hosted zone that matched the project creator's domain name (jhooq.org) and assigned it to the VPC that was created by Terraform. I finally uncommented the rest of the code and re-ran a terraform init, terraform plan and a terraform apply. If you choose to go the private hosted zone route, then for some reason I had to go through the sequence one more time to make sure the HTTPS listener was installed...if you can figure out why then bonus points...I tried a depends_on clause to make sure the certificate import stage is based on the certificate generate stage...perhaps I need to adjust the code elsewhere to make sure the ALB listener depends on the import. Once everything was created, I went to the Load Balancers console page and I was able to reach the jenkins instance with the provided DNS name after I clicked on the provisioned load balancer (NOT the private DNS name -- that will only be resolvable within the VPC, but it helps fulfill the requirement that all ALBs need a certificate attached to it)...so I went ahead and opened up another browser window to log to access the jenkins machine through the ELB DNS name and left that window open.
+
+Jenkins URL: http://dev-proj-1-alb-1498229335.us-east-1.elb.amazonaws.com/
+
+
+17. Navigated to the EC2 section within the AWS console. Found the running jenkins instance and navigated to its page by clicking on the 'Instance ID' link. Clicked on the 'Connect' button. I tweaked the code to ssh into the machine by making sure I use the full path to change the public key file (you can also use the Instance Connect feature in AWS to pull up a terminal for the jenkins machine): 
+
+chmod 400 ~/.ssh/jenkins_demo
+ssh -i ~/.ssh/jenkins_demo ubuntu@[JENKINS_PUBLIC_IP] 
+
+and I was able to ssh into the jenkins machine. 
+
+I ran the following commands to install the aws cli and configure aws with my sandbox credentials:
+
+sudo apt install awscli -y
+
+also, type 'aws configure' and configure the jenkins instance with your credentials
+
+I rand the command below to retrieve the password for Jenkins, then pasted it in the Jenkins page on my browser to sign in.
+
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+Clicked on 'Install Suggested Plugins' and then created a user profile before clicking 'Save and Continue'. Left the instance configuration default URL as is, and clicked 'Save and Finish'.
+
+
+
+18. Moved my focus to the flask-application folder which deals with using the provisioned Jenkins instance to automate setting up a separate VPC with its own networking and infrastructure before creating another EC2 instance that will host the application itself...so basically, Jenkins can do much of what Terraform can do plus a little more -- Terraform is a declarative type of program that will set things up and then stop running...adjusting infrastructure setups and designs means that the user has to go through the terraform init/plan/apply sequence again and again, and once it's done doing what it's doing then it's done...that's it. Jenkins can automate some of the details about how the application itself will be managed and also provide a consistent environment for oversight of the health of the application while the program continues to run, as well as options for automating pipelines for continuous deployment (where a developer can adjust code and instantly see saved changes in their repositories as well as changes in the application).
+
+
+19. I copied the contents of the private zone folders that I created in my personal setup from the terraform-jenkins folder to the flask-application folder. Again, this is an optional deviation from the main structure of the project that I did in order to make sure everything remains in the free tier. 
+
+cp -r ~/real-time-devops/terraform-jenkins/certificate-manager-private ~/real-time-devops/flask-application/devops-project-1/infra/
+cp -r ~/real-time-devops/terraform-jenkins/certificate-manager-private-generate ~/real-time-devops/flask-application/devops-project-1/infra/
+
+I then used the command below to copy the aws_certification_manager_generate and aws_certification_manager modules from the main.tf file from the terraform-jenkins setup in order to replace the aws_certification_manager module in the main.tf file of the flask application code:
+
+cat ~/real-time-devops/terraform-jenkins/main.tf
+
+
+
+20. Went back to the jenkins tab, clicked on 'Manage Jenkins', 'Plugins', and then 'Available plugins'. Typed 'aws steps' in order to download a plugin that will allow Jenkins to communicate with aws through provided credentials. I also typed in 'SSH Agent' to install the SSH Agent plugin. I personally decided to click on the Restart after download option by clicking the checkbox at the bottom of the install page, and then I signed back in. 
+
+
+
+21. Went back to 'Manage Jenkins' then clicked on 'Credentials', then 'System', then 'Global credentials', and then clicked on the blue '+ Add credentials' button. Selected 'AWS Credentials' as the Kind. I made sure that I was within the 'infra' folder within the flask-application/devops-project-1 folder, and I used the 'cat Jenkinsfile' command back in my server terminal to open the Jenkinsfile. Copied the 'CredentialsId' object information (aws-crendentails-rwagh) and pasted it into the ID section on the Jenkins page...then pasted the Access Key ID and the Secret Access Key ID associated with the project before I clicked on 'Create'. 
+
+
+
+22. I then went back into the 'Credentials' section to add another credential...I selected 'SSH Username with private key' and chose 'ssh-agent' for the ID on the Jenkins machine. I entered 'jenkins' as the username. I then clicked on the 'Enter directly' radio button underneath the Private Key and then 'Add', went back to my local server and entered the 'cat ~/.ssh/jenkins_demo' command to reveal the contents of my private key file (make sure no one's peeking over your shoulder for this step!). I copied the contents of my jenkins_demo private key (INCLUDING the BEGIN/END RSA PRIVATE KEY LINES) and pasted the contents into the Private Key space before I clicked on 'Create'.  
+
+
+
+23. I went back to the Jenkins home page and clicked on '+ New Item'. Decided on 'dev-project-1-us-west-2-pipeline' as the name for the pipeline. I scrolled down to the Pipeline section and made sure that the option for the Definition was set to 'Pipeline script' so that I can paste my version of the Jenkinsfile where I made edits (adding a stage to change the bucket name, region name, edits to include modules for generating a private certificate for the load balancer and importing that certificate, etc.). MAKE SURE TO CHANGE THE IP ADDRESS FOR THE SSH-AGENT TO THE PUBLIC IP FOR THE ACLOUDGURU SERVER. In a notes editor, I navigated to the github URL for the project (https://github.com/rahulwagh/devops-project-1/tree/main), retrieved the Jenkinsfile in that repository and made the edits I needed. I'll make sure to submit my altered Jenkinsfile in addition to these code notes. **An important thing of note...the t2.micro is no longer acceptable for the RDS instance -- a t3.micro is the cheapest option available. Also, note that the AMI ID values are different depending on the region that you choose (the same ubuntu image will have a different ami id depending on the region that you are in. So it's safe to presume that you are going to have to make adjustments to the Jenkinsfile. Make sure to either fork the repo to your own GitHub, alter the Jenkinsfile within your own repo so that you use that Jenkinsfile for the 'Pipeline script from SCM' option, or create a custom Jenkinsfile that makes the necessary changes for your project to run smoothly and select the 'Pipeline script' option. 
+
+
+
+24. Build process
+
+1)  Build Now
+
+2)  INIT_NETWORKING, TERRAFORM_INIT, TERRAFORM_PLAN, TERRAFORM_APPLY to set up just the S3 bucket for the remote state storage and the VPC
+
+2b) Create a private hosted zone in your chosen flask application region with the domain name of interest. If you want to use the same domain name, you are best off deleting the hosted zone in your jenkins region and recreating a new one in the region where you are building the application. Thing of note: ami-id values differ by region (even if it's the same type of software image) so be weary of that.
+
+3)  INIT_INFRASTRUCTURE, TERRAFORM_INIT, TERRAFORM_PLAN, TERRAFORM APPLY to set up the whole environment. 
+
+*Make sure you check the INIT_INFRASTRUCTURE whenever you feel a need to re-run terraform plan or terraform apply. Checking this box skips the stages involved with cloning the repository and setting up your file system...if these stages aren't skipped after your terraform state has been established, then the terraform state of the cloned repository will disrupt the execution of the code.
+
+4)  After everything is set up, be sure to find your RDS endpoint by searching the RDS page in the console, then use EC2 Instance connect to connect to the EC2 instance for your app, change the permissions of the app.py file (navigate to the python-mysql-db-proj-1 folder and run the 'sudo chmod u+w app.py' command), open up the app.py file (also using sudo with your preferred editor) and replace the rds endpoint. 
+
+
+Et voila! If you have gotten this far then pat yourself on the back and play with the application a bit...congratulations on completing a production-level devops project! Keep striving, keep learning and keep preparing yourself to join a team to change the world...one small step at a time. 
+
+
+
+
+
+
+
+How to create a Private Hosted Zone with this Project in order to keep EVERYTHING in the free tier:
+
+
+1) Make two separate folder...you are going to use the website below to form your own certificate authority which certifies your own certificate that you will import into AWS to serve as the certificate for your load balancer which is assigned a private hosted zone through DNS. In my case, I decided to copy the contents of the certificate-manager folder into a folder named certificate-manager-private (which is used to replace the certificate-manager module's role in the main.tf file of providing the output 'dev_proj_1_acm_arn' ARN value) and then I created another folder named certificate-manager-private-generate (which is used to provide the Terraform code that generates the certificate that ends up getting imported before AWS assigns an ARN which can serve as the output for the first folder). Whew. Ok here we go. 
+
+
+2) Use the reference website below as a reference for building your code in your certificate-manger-private folder: 
+
+I navigated to the website below which was a wonderful reference for my ACloudGuru Server (an Amazon Linux 2 machine). You may have to do some extra digging if you have a Windows machine...but take on the challenge of building your own Terraform code in order to generate a private certificate! It's a great way to really learn how output values, modules, data blocks vs. resource blocks, and so much more work in Terraform. 
+
+https://amod-kadam.medium.com/create-private-ca-and-certificates-using-terraform-4b0be8d1e86d
+
+It's a great reference. The great thing about a private hosted zone is that you can use any DNS domain name that you want...because the hosted-zone will only resolve DNS names from within your VPC environment. Google.com? Cool. Yahoo.com? No problem. In my case, I decided to stick to jhooq.org to stay as true to the original Terraform code as possible. You're not necessarily going to use the DNS name to reach the load balancer...but ALB's need a certificate, the certificate needs to be validated (in the case of public certificates -- or certificates used for load balancers that will utilize public hosted zones -- the zones that require bought and paid for domain names that can be registered in tld name servers so that they are resolvable over the internet), and the public certificate has two options for being validated: a DNS process, and an EMAIL process. In our case, we are using a private hosted zone and so we can use a private certificate to attach to the load balancer...but it won't be resolvable over the internet (again, it will just work within the VPC...you may need to set up a bastion host and a custom DNS setup or use some other kind of strategy to make it work over the internet). 
+
+So in summary, in my certificate-manager-private-generate folder, I created a main.tf file where I copied much of the code from the website that I referenced above. I copied the relevant terraform code for the main.tf file (the resource blocks, etc....), and I replaced the 'cloudmanthan' values with 'jhooq', 'IN' with 'US', 'Mahrashatra' with 'District of Columbia', 'Mumbai' with 'Washington D.C. These are all values that you can change according to your own choices...just stay consistent with the code provided, and try to understand the steps that are taken to set up the generation of the private certificate. 
+
+
+
+3) I added the following data block and the output values to the top of the main.tf file of the certificate-manager-private-generate folder in my code. Feel free to dig deep on what data blocks and output values do...but I learned by doing and I came to an understanding that output values play a role in providing values outside of the current module that can be imported into other modules. Data blocks are like resource blocks minus the onus on Terraform to create anything...they rather serve as a reference to resources that have already been created. Feel free to alter the code below to the values you chose for the domain that you chose, the names you want to choose for the output values and/or the data block, etc. Also, I added a resource block to wait 2 minutes, as well as what are called 'triggers' to the import_certificate block at the bottom...I did this in order to make sure that the data block and the output block work on retrieving the ARN after the certificate was imported. Prior to manipulating the code, the data block and output block would run immediately after the certificate was imported...and for some reason Terraform would register an error claiming that it wasn't imported (if I ran the terraform plan/apply sequence a second time back-to-back then it worked fine).
+
+resource "time_sleep" "wait" {
+  depends_on = [null_resource.import_certificate]
+  create_duration = "120s"
+}
+
+data "aws_acm_certificate" "cert" {
+  domain      = null_resource.import_certificate.triggers.domain
+  #domain   = "jenkins.jhooq.org"
+  statuses = ["ISSUED"]
+  depends_on = [time_sleep.wait]
+}
+
+output "certificate_arn" {
+  description = "The ARN of the imported certificate"
+  value       = data.aws_acm_certificate.cert.arn
+}
+
+output "internal_cert_private_key_path" {
+  value = local_file.cm_internal_key.filename
+}
+
+output "internal_cert_chain_path" {
+  value = "${local_file.cm_internal_cert.filename} ${local_file.jhooq_ca_cert.filename}"
+}
+
+---------------------------------------------------------------------------------------------
+
+
+# Import certificate to ACM using AWS CLI local-exec provisioner
+
+resource "null_resource" "import_certificate" {
+  provisioner "local-exec" {
+    command = "aws acm import-certificate --certificate fileb://${local_file.cm_internal_cert.filename} --private-key fileb://${local_file.cm_internal_key.filename} --region us-east-1"
+  }
+
+  triggers = {
+    certificate_cert = local_file.cm_internal_cert.content
+    certificate_key  = local_file.cm_internal_key.content
+    domain           = "jenkins.jhooq.org"
+  }
+
+
+4) In the certificate-manager-private folder (the second folder, used to acknowledge the arn value once the certificate is imported), I created a variables.tf file as well as a main.tf file. I learned this through trial and error so I have no reference here. In the variables.tf file, I added the following code:
+
+variable "internal_cert_private_key_path" {
+  description = "The path to the private key"
+  type        = string
+}
+
+variable "internal_cert_chain_path" {
+  description = "The path to the certificate chain"
+  type        = string
+}
+
+variable "certificate_arn" {
+  description = "The arn of the imported certificate"
+  type        = string
+}
+
+Notice that they match the output values of the certificate-manager-private-generate main.tf file. This is important for consistency and convenience in your code. 
+
+In the main.tf file of the certificate-manager-private folder I just have the following code:
+
+variable "domain_name" {}
+variable "hosted_zone_id" {}
+
+output "dev_proj_1_acm_arn" {
+  value = var.certificate_arn
+}
+
+Notice that I deleted the resource block that was below in the certificate-manager folder that deals with validating the certificate...this is confirmation of the need for public certificates to be validated, while private certificates do not need to go through with this process -- this file is about replacing the arn of the certificate that needs to go through the validation process with the arn of the imported certificate...and that's it!
+
+
+5) In the overall main.tf file within the Terraform-Jenkins folder, I replaced the aws_certification_manager module (which deals with the certificate-manager folder) with the code below:
+
+module "aws_certification_manager_generate" {
+  source                         = "./certificate-manager-private-generate"
+}
+
+module "aws_certification_manager" {
+  source                         = "./certificate-manager-private"
+  domain_name                    = "jenkins.jhooq.org"
+  hosted_zone_id                 = module.hosted_zone.hosted_zone_id
+  internal_cert_private_key_path = module.aws_certification_manager_generate.internal_cert_private_key_path
+  internal_cert_chain_path       = module.aws_certification_manager_generate.internal_cert_chain_path
+  certificate_arn                = module.aws_certification_manager_generate.certificate_arn
+
+  depends_on = [
+    module.aws_certification_manager_generate
+  ]
+}
+
+Notice I included a 'depends_on' variable that clearly helps Terraform understand that the private certificate needs to be generated first before it's ARN can be assigned to an output value that will be attached to the load balancer. Also, notice that because the project uses an overall main.tf file that uses modules to call the main.tf file within the component folders, there is a need to reference the output variables from the certificate-manager-private-generate module within the certificate-manager-private module in order to connect the overall logic. 

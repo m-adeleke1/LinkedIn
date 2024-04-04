@@ -1,0 +1,281 @@
+pipeline {
+    agent any
+
+    parameters {
+            booleanParam(name: 'INITIATE_NETWORKING', defaultValue: false, description: 'Check to plan Terraform changes')
+            booleanParam(name: 'INITIATE_INFRASTRUCTURE', defaultValue: false, description: 'Check to plan Terraform changes')
+            booleanParam(name: 'INIT_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
+            booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
+            booleanParam(name: 'APPLY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
+            booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
+    }
+
+    stages {
+        stage('Clone Repository') {
+            when {
+                expression { !params.INITIATE_INFRASTRUCTURE }
+            }
+            steps {
+                // Clean workspace before cloning (optional)
+                deleteDir()
+
+                // Clone the Git repository
+                git branch: 'main',
+                    url: 'https://github.com/rahulwagh/devops-project-1.git'
+
+                // Confirm that the repository has downloaded
+                sh "ls -lart"
+
+                // Add security group rules for the load balancer
+                script {
+                
+                def filePath = './infra/security-groups/main.tf'
+                def newContent = """
+  # enable traffic on port 5000 for HTTP and HTTPS
+  ingress {
+    description = "Allow traffic on port 5000 (HTTP and HTTPS) from anywhere"
+    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = 5000
+    to_port     = 5000
+    protocol    = "tcp"
+  }"""
+
+               // Read the content of the file
+               def fileContent = readFile(filePath)
+
+               // Split the content into lines
+               def lines = fileContent.readLines()
+
+               // Insert the new content at line 49
+               lines.add(48, newContent)
+
+               // Join the lines back into a single string
+               def updatedContent = lines.join('\n')
+
+               // Write the updated content back to the file
+               writeFile(file: filePath, text: updatedContent)
+
+               // Confirm the file looks complete
+               sh "cat './infra/security-groups/main.tf'"
+            }
+          }
+        }
+
+       
+       stage('Copy Certificate Manager Folders') {
+         when {
+                expression { !params.INITIATE_INFRASTRUCTURE }
+            }
+    steps {
+        // Copy certificate-manager-private folder
+        sshagent(['ssh-agent']) {
+            sh "whoami"
+            sh "pwd"
+            sh "hostname -I"
+            sh "ssh -o StrictHostKeyChecking=no cloud_user@[SERVER_PUBLIC_IP]"
+            sh "scp -r cloud_user@[SERVER_PUBLIC_IP]:/home/cloud_user/real-time-devops/flask-application/devops-project-1/infra/certificate-manager-private ./infra/"
+            sh "scp -r cloud_user@[SERVER_PUBLIC_IP]:/home/cloud_user/real-time-devops/flask-application/devops-project-1/infra/certificate-manager-private-generate ./infra/"
+           }
+        }
+    }
+
+
+      stage('Modify main.tf') {
+        when {
+                expression { !params.INITIATE_INFRASTRUCTURE }
+            }
+    steps {
+        script {
+            // Modify the main.tf file to include the aws_certification_manager_generate module and the aws_certification_manager module
+            sh '''
+                sed -i "73,77 s/^/#/" ./infra/main.tf
+                sed -i "78i\n" ./infra/main.tf
+                sed -i "79imodule aws_certification_manager_generate {\\n  source                         = \\"./certificate-manager-private-generate\\"\\n}" ./infra/main.tf
+                sed -i "83imodule aws_certification_manager {\\n  source                         = \\"./certificate-manager-private\\"\\n  domain_name                    = \\"jenkins.jhooq.org\\"\\n  hosted_zone_id                 = module.hosted_zone.hosted_zone_id\\n  internal_cert_private_key_path = module.aws_certification_manager_generate.internal_cert_private_key_path\\n  internal_cert_chain_path       = module.aws_certification_manager_generate.internal_cert_chain_path\\n  certificate_arn                = module.aws_certification_manager_generate.certificate_arn\\n\\n  depends_on = [\\n    module.aws_certification_manager_generate\\n  ]\\n}\\n" ./infra/main.tf
+            '''
+
+            sh "cat ./infra/main.tf"
+
+          } 
+      } 
+  }
+
+
+       stage('Modify Cloned Environment') {
+             when {
+                expression { !params.INITIATE_INFRASTRUCTURE }
+            }
+            steps {
+                // Replace key file names and file contents to make the project distinct
+                script {
+                    // Change the default region for the project
+                    sh "find . -type f -exec sed -i 's/eu_central/us_west/g' {} +"
+                    sh "find . -type f -exec sed -i 's/eu_west/us_west/g' {} +"
+                    sh "find . -type f -exec sed -i 's/eu-central/us-west/g' {} +"
+                    sh "find . -type f -exec sed -i 's/eu-west/us-west/g' {} +"
+                    sh "find . -type f -exec sed -i 's/eu_/us_/g' {} +"
+                    sh "find . -type f -exec sed -i 's/eu-/us-/g' {} +"
+                    sh "find . -type f -exec sed -i 's/west-1/west-2/g' {} +"
+                    sh "find . -type f -exec sed -i 's/west_1/west_2/g' {} +"
+                    sh "find . -type f -exec sed -i 's/dev-proj-1-remote-state-bucket-123456/YOUR_BUCKET_NAME_FOR_THE_FLASK_APPLICATION_PROJECT/g' {} +"
+                    sh "find . -type f -exec sed -i 's/\"dev-proj-1-remote-state-bucket\"/\"YOUR_BUCKET_NAME_FOR_THE_FLASK_APPLICATION_PROJECT\"/g' {} +"
+                    sh "find . -type f -exec sed -i 's/apache/python/g' {} +"
+                    sh "find . -type f -exec sed -i 's/Apache/Python/g' {} +"
+                    sh "find . -type f -exec sed -i 's/ceritification/certification/g' {} +"
+                    sh "find . -type f -exec sed -i 's/private_zone = false/private_zone = true/g' {} +"
+                    sh "find . -type f -exec sed -i 's/ami-0694d931cee176e7d/ami-080e1f13689e07408/g' {} +"
+                    sh "find . -type f -exec sed -i 's/ami-06dd92ecc74fdfb36/ami-08116b9957a259459/g' {} +"
+                    sh "find . -type f -exec sed -i 's/db.t2.micro/db.t3.micro/g' {} +"
+                    sh "find . -type f -exec sed -i 's/t2.micro/t2.medium/g' {} +"
+                    
+
+                    //Replace the public key that is provided in the project with the public key that is intended for your project
+                    sh "find . -type f -exec sed -i 's|ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDwmgMHFJE7J4qepIzAZL3/yC6J0zsEAb/oHYL+WBBDNUjSH4TeHUnHVNe9b/pyPcub+O/HNvlGrzSxUp0xT0b3O7kkTtgBKiG8NaBbonj+c7byfOGER80DYxc5adlBltuIDd8StFe7OMzbYyUSr1mdxDTIWm/OoE39G/fu3hTqUGkykv072GAy8nMFejITRw9pf+53B9ziE5rsdOUH4uqBiQa/Ng/qKo7h9MtJGcloRATYiObXwAgrHtt3sDrtvkq2ZceT906/BJm1Twlm+BHlQecHV18Ak3bzm/6HzlsA/q+yORsoB+VxSUxvVy0nXTc1X8vJAD4KSYVL5DTrpisdnQAIcuqAbea+LMku2o4sdnrrIlUi8/8BXeVbI4TNNGd0+sWpCVcDEhb4gyA/XXTvloQyjTYrL4+am/9XEY6NGdsrPK74sjvtpUZPUrmzTJ/mJWG5ncGY88GAj+YZAsY5pnAqh2CkR2TUpglugldnWyrppbe2QyC9iQkgUGSkBTs= rahulwagh@Rahuls-MacBook-Pro.local|[JENKINS_DEMO_PUBLIC_KEY]|g' {} +"
+
+
+                    // Rename files with 'apache' in the filename to 'python'
+                    sh "find . -type f -name '*apache*' -exec bash -c 'mv \"\$0\" \"\${0/apache/python}\"' {} \\;"
+
+                    // Rename files with 'Apache' in the filename to 'Python'
+                    sh "find . -type f -name '*Apache*' -exec bash -c 'mv \"\$0\" \"\${0/Apache/Python}\"' {} \\;"
+
+                }
+            }
+        }
+
+
+      stage('Initiate s3 and Networking') {
+            steps {
+               script {
+                    if (params.INITIATE_NETWORKING) {
+                // Replace bucket name in files
+                script {
+
+                    // Define the paths to the main.tf files
+                    def s3MainTfPath = "./infra/s3/main.tf"
+                    def infraMainTfPath = "./infra/main.tf"
+                    
+                    // Remove /* on line 2 and */ on line 17 from s3/main.tf
+                    sh "sed -i '2s/\\/\\*//' $s3MainTfPath"
+                    sh "sed -i '17s/\\*\\///' $s3MainTfPath"
+                    
+                    // Remove /* on line 1 and */ on line 6 from infra/main.tf
+                    sh "sed -i '1s/\\/\\*//' $infraMainTfPath"
+                    sh "sed -i '6s/\\*\\///' $infraMainTfPath"
+
+                   // Add /* on line 16 and */ on the last line of infra/main.tf
+                       sh """
+                         sed -i '16s/^/\\/\\* /' "$infraMainTfPath" && sed -i '\$s/\$/ \\*\\//' "$infraMainTfPath"
+                       """
+
+                   // Print the modified infra/s3/main.tf content for confirmation
+                    sh "cat $s3MainTfPath"
+
+                   // Print the modified infra/main.tf content for confirmation
+                    sh "cat $infraMainTfPath"
+
+                   // Remove the default remote backend folder that is associated with the project
+                    sh "rm -rf ./infra/remote_backend_s3.tf"
+                       }
+                    }
+                }
+            }
+        }
+
+
+
+        stage('Initiate Infrastructure') {
+            steps {
+               script {
+                    if (params.INITIATE_INFRASTRUCTURE) {
+                // Replace bucket name in files
+                script {
+                    // Define the paths to the main.tf files
+                    def s3MainTfPath = "./infra/s3/main.tf"
+                    
+                    // Remove /* on line 2 and */ on line 17 from s3/main.tf
+                    sh "sed -i '2s/\\/\\*//' $s3MainTfPath"
+                    sh "sed -i '17s/\\*\\///' $s3MainTfPath"
+
+                    // Define the paths to the main.tf files
+                    def infraMainTfPath = "./infra/main.tf"
+                    
+                    // Remove /* on line 16 and */ on the last line from infra/main.tf
+                    sh "sed -i '16s/\\/\\*//' $infraMainTfPath"
+                    sh "sed -i '\$s/\\*\\///' $infraMainTfPath"
+
+                    // Print the modified infra/s3/main.tf content for confirmation
+                    sh "cat $s3MainTfPath"
+
+                    // Print the modified infra/main.tf content for confirmation
+                    sh "cat $infraMainTfPath"
+                       }
+                    }
+                }
+            }
+        }
+
+
+
+        stage('Terraform Init') {
+                    steps {
+                        script {
+                             if (params.INIT_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                            sh 'echo "=================Terraform Init=================="'
+                            sh 'terraform init'
+                            }
+                        }
+                     }
+                 }
+             }
+        }
+
+
+        stage('Terraform Plan') {
+            steps {
+                script {
+                    if (params.PLAN_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                                sh 'echo "=================Terraform Plan=================="'
+                                sh 'terraform plan'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                script {
+                    if (params.APPLY_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                                sh 'echo "=================Terraform Apply=================="'
+                                sh 'terraform apply -auto-approve'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Destroy') {
+            steps {
+                script {
+                    if (params.DESTROY_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                                sh 'echo "=================Terraform Destroy=================="'
+                                sh 'terraform destroy -auto-approve'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
