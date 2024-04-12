@@ -1,0 +1,70 @@
+A special thank you to Prince Ogabi for setting up this project. 
+
+
+This project looks at google cloud, terraform, and ansible to set up a classic 3 environment setup in the cloud: dev, staging and prod. 
+
+Per usual from my end, I'll be working with ACloudGuru sandbox environments to get things going. 
+
+https://gitlab.com/ogabiprince/iac-cicd
+
+
+
+1. Launched an ACloudGuru server. 
+
+Username: [YOUR_SERVER_USERNAME]
+Password: [YOUR_SERVER_PASSWORD]
+
+Public IP: [YOUR_SERVER_PUBLIC_IP]
+Private IP: [YOUR_SERVER_PRIVATE_IP]
+IPv6: [YOUR_SERVER_IPv6] 
+
+
+
+
+2. Navigated to GitLab and linked my GitHub account to GitLab in order to start a free trial.
+
+https://gitlab.com
+
+(follow the on screen instructions to sign up after clicking the 'Free Trial' button. There should be a small button with the GitHub logo there to link your account to a new GitLab space. I didn't have to fill in any username information or anything...it was a really easy 1-click link)
+
+I then went on to create my first personal access token in GitLab using the instructions from the website below:
+
+https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#create-a-personal-access-token
+
+* Make sure you copy the newly created token by clicking on the copy icon (should be on the far right next to your new asterisk-covered access token that is within the green area on the screen) and paste it below:
+
+GitLab Access Token: [YOUR_GITLAB_ACCESS_TOKEN]
+
+
+
+3. Spun up a GCP Sandbox environment to use for the sake of the project
+
+Username: [YOUR_GCP_USERNAME]@[YOUR_GCP_HOSTNAME]
+Password: [YOUR_GCP_PASSWORD]
+
+URL:      [YOUR_GCP_URL]
+
+Service Account Credentials: [YOUR_GCP_SERVICE_ACCOUNT]
+
+
+
+4. Clicked on the Small '+' sign in the top left corner of my new GitLab account to create a new project. I chose to import the project, and then clicked "Repository from URL"
+
+I entered the following information into the Repo URL location:
+
+https://gitlab.com/ogabiprince/iac-cicd.git
+
+I changed the name of the project to IAC_CICD, and made sure my username for gitlab was provided for the prefix. I left the rest of the settings as default and created the project.
+
+
+
+5. I clicked on my version of the project that is located within my brand new GitLab repository, then clicked on 'Settings', then clicked on CICD. I clicked on 'Expand' next to 'Variables'. I added two variables (click on 'Add Variable'). One was a file type (make sure the type option pulldown is on 'File') variable with a key called CREDENTIAL and a value being the pasted service account JSON value that was offered as part of my GCP sandbox. If you are using a separate GCP account, you can google how to create a service account (if needed) and also how to retrieve the service account JSON file. I pasted everything withing the {} (including those outer brackets) of the json vile as the value for the CREDENTIAL variable. I then created a variable type called GITLAB_ACCESS_TOKEN and pasted the value for my newly created Gitlab Access Token.
+
+
+
+5. Navigated to dev/provider.tf within my project and clicked on the Blue 'Edit' button. Selected 'Edit this single file only' (this edit process is repeated to complete all the subsequent changes) and changed the value of the project name to the GCP sandbox that I am using. I repeated the same thing for staging/provider.tf and also prod/provider.tf. I then navigated to the modules/debian_vm/variables.tf file in order to change the default value for the 'ssh_user' variable from 'ogabiprince' to my GitLab username. I then navigated to my project, clicked on 'Settings' on the left-hand side, then clicked on 'General' in order to copy the Project ID value. I then went to the .gitlab-ci.yml file within the project, located the TF_ADDRESS variable, and replaced the project ID value there with my own Project ID. I then went to the ansible_files/ansible.cfg file to change the remote user to my GitLab username.
+
+
+6. Et voila! If you go to the Jobs section of the Build portion of the project, you should see that the whole process is automated to generate SSH keys, and then deploy a set of VMs that serve as your dev, staging, and prod NGINX environments. If all works as planned, you should see a string of green check marks starting from the generation of SSH keys stages (the first ansible stage) up until the ansible configuration stages (ansible_conf) for dev, staging and prod. After that, there should be manual stages available to destroy the separate environments (just push the play buttons next to the environments that you would be interested in destroying). If you do not have a sequence of green check marks before the dry_destroy and actual_destroy manual stages, then feel free to click on pipelines and push play on the most recently created pipeline and/or have fun using your detective work to debug and diagnose the issue. This project is a great way to reverse-engineer the devops process and to explore GitLab to understand how it works. I learned about the GitLab build process and how it can be utilized to automate the provisioning of IAC through the use of Terraform and Ansible code into Google Cloud. Thanks to a wonderfully designed process by Prince Ogabi, I can now review the code to understand how the Ansible component, the Terraform components, and Google Cloud work together -- I will do this by dissecting the components of the code to understand how they work together to provision the overall environment. Thanks Prince!
+
+
