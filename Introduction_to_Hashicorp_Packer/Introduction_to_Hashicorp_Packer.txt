@@ -1,0 +1,141 @@
+I have a rudimentary understanding of how Hashicorp Packer works. I'm going to go through this beginner-level project to try to deploy an AMI image onto AWS.
+
+
+https://devopscube.com/packer-tutorial-for-beginners/
+
+
+
+1. Launched an ACloudGuru server. 
+
+Username: [SERVER_USERNAME]
+Password: [SERVER_PASSWORD]
+
+Public IP:  [SERVER_PUBLIC_IP]
+Private IP: [SERVER_PRIVATE_IP]
+IPv6:       [SERVER_IPv6]
+
+
+
+2. Ran the code below to install Packer:
+
+sudo yum update -y
+
+wget https://releases.hashicorp.com/packer/1.10.2/packer_1.10.2_linux_amd64.zip
+
+unzip packer_1.10.2_linux_amd64.zip
+
+sudo mv packer /usr/local/bin/
+
+packer version
+
+
+
+3. Verified the Packer version
+
+packer version
+
+
+
+4. Ran the following commands to create a folder called 'packer-vm', then I created a file within the folder named 'vm.pkr.hcl'.
+
+mkdir packer-vm
+cd packer-vm
+vim vm.pkr.hcl
+
+
+
+5. Started an AWS sandbox
+
+Username:          [SANDBOX_USERNAME]
+Password:          [SANDBOX_PASSWORD]
+URL:               [SANDBOX_URL]
+Access Key:        [SANDBOX_ACCESS_KEY]
+Secret Access Key: [SANDBOX_SECRET_ACCESS_KEY]
+
+
+
+6. Ran 'aws configure' and added the relevant credentials
+
+[[SERVER_USERNAME]@30e886e91d1c packer-vm]$ aws configure
+AWS Access Key ID [None]:     [SANDBOX_ACCESS_KEY]
+AWS Secret Access Key [None]: [SANDBOX_SECRET_ACCESS_KEY]
+Default region name [None]:   us-east-1
+Default output format [None]: json
+
+
+
+7. Pasted the code below into the hcl file. I made sure to check for the ami id for the RHEL os for the us-east-1 region. Make sure to check the AMI ID for the region that you are using:
+
+
+packer {
+  required_plugins {
+    amazon = {
+      source  = "github.com/hashicorp/amazon"
+      version = ">= 0.0.1"
+    }
+  }
+}
+
+variable "ami_id" {
+  type    = string
+  default = "ami-0fe630eb857a6ec83"
+}
+
+variable "app_name" {
+  type    = string
+  default = "httpd"
+}
+
+locals {
+    app_name = "httpd"
+}
+
+source "amazon-ebs" "httpd" {
+  ami_name      = "PACKER-DEMO-${local.app_name}"
+  instance_type = "t2.micro"
+  region        = "us-east-1"
+  source_ami    = "${var.ami_id}"
+  ssh_username  = "ec2-user"
+  tags = {
+    Env  = "DEMO"
+    Name = "PACKER-DEMO-${var.app_name}"
+  }
+}
+
+build {
+  sources = ["source.amazon-ebs.httpd"]
+
+  provisioner "shell" {
+    script = "script/script.sh"
+  }
+
+  post-processor "shell-local" {
+    inline = ["echo foo"]
+  }
+}
+
+
+
+
+8. Made a script.sh file and pasted the relevant code below.
+
+mkdir script && cd script
+
+vim script.sh
+
+#!/bin/bash
+sudo yum -y update
+sudo yum install -y httpd
+
+
+
+9. Ran the code below to init the plugins, validate, and build the packer hcl template
+
+packer init .
+
+packer validate vm.pkr.hcl
+
+packer build vm.pkr.hcl
+
+
+10. And that's it! I checked the AWS account and there was one terminated instance, one security group and one snapshot. So the packer process deals with provisioning a machine to design and load the custom os image, save that image as a snapshot, and then delete the instance. The software is very useful for customization processes because it can load tools like ansible for custom configuration management. Cool Stuff! 
