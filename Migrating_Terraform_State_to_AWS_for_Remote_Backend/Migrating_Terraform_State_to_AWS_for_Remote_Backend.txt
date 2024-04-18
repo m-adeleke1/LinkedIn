@@ -1,0 +1,222 @@
+Hello peoples! Special thank you to Ronie Horca for providing very good instructions on how to create a Terraform project and then migrate the state file to an S3 bucket as well as the lock file to a DynamoDB table. 
+
+The terraform state file is a document that records the configuration as well as the most recent changes to your terraform environment. It is common to use an S3 bucket to store a state file when multiple people are working on a terraform project -- a common s3 bucket can serve as the "configuration of truth" while multiple engineers adjust aspects of the terraform deployment code. This way, terraform won't get confused as to what has already provisioned and what changes need to be made to the environment once code is updated from different machines. 
+
+The Terraform lock file is used to prevent concurrent modifications to Terraform state. When Terraform performs operations such as apply or destroy, it acquires a lock on the state file to ensure that only one process can modify the state at a time. This prevents potential conflicts and data corruption that could occur if multiple processes were to simultaneously modify the state.
+
+By default, Terraform uses a lock file stored in the backend storage (e.g., an S3 bucket) to manage locking. However, in certain scenarios, such as when using remote backends like S3, managing locks using a file can be inefficient or unreliable, especially in distributed environments or when multiple Terraform users are working on the same infrastructure.
+
+To address these issues, Terraform offers the option to use a distributed lock management solution, such as DynamoDB, to store and manage locks instead of relying on lock files. When configured to use DynamoDB for locking, Terraform creates and manages lock records in a DynamoDB table, allowing for more reliable and scalable lock management in distributed environments.
+
+This is also a great project to understand how AWS KMS and IAM services work. The IAM service is used in this project to create a Terraform User...who has the privileges to access the account along with the original admin user of the account. This is a great piece of code to understand how to onboard a new member of the team by creating a user profile and then adding that profile to an IAM group. Policies can then be applied to the group in order to make it easy to rotate users in and out of relevant groups that they are a part of. The KMS service is used to create customer managed encryption keys for the S3 backend bucket and the DynamoDB Table in order to ensure that the data remains encrypted within storage. 
+
+I appreciate Ronnie's approach of using shell scripts to integrate Ansible, Packer, and Terraform deployments while also using GitLab. Look out for more projects like this in the future!
+
+
+https://aws.plainenglish.io/how-to-securely-manage-terraform-state-file-in-aws-using-terraform-7c20b211c9cb
+
+
+
+1. Launched an ACloudGuru Amazon Linux 2 server. 
+
+Username: cloud_user
+Password: [SERVER_PASSWORD]
+
+Public IP: [SERVER_PUBLIC_IP]
+Private IP: [SERVER_PRIVATE_IP]
+IPv6: [SERVER_IPv6]
+
+
+
+2. Made sure I ran the following commands to install docker and keybase on the cloud server (these are prerequisites for this project).
+
+sudo yum update -y
+
+sudo yum install docker -y
+
+sudo usermod -aG docker $USER
+
+sudo systemctl restart docker
+
+docker --version
+
+Keybase URL: https://keybase.io (navigated to the URL, clicked the 'Login' button, clicked the 'Join Keybase' button, and entered the relevant information to join.)
+
+Figure out your machine os type and architecture in order to install the Keybase CLI:
+
+sudo yum install https://prerelease.keybase.io/keybase_amd64.rpm
+
+run_keybase
+
+You must generate a Keybase PGP key to continue...go ahead and run the commands below on your machine:
+
+keybase login
+
+[keybase username]
+
+[keybase password]
+
+enter a keybase name for your server. I just named mine cloud_user to match the login name for ACloudGuru servers and sandboxes
+
+you must finally generate a pgp encryption key with the following CLI command:
+
+keybase pgp gen
+Enter your real name, which will be publicly visible in your new key: [YOUR_NAME]
+Enter a public email address for your key: [YOUR_EMAIL]
+Enter another email address (or <enter> when done): 
+Push an encrypted copy of your new secret key to the Keybase.io server? [Y/n] Y
+When exporting to the GnuPG keychain, encrypt private keys with a passphrase? [Y/n] n
+
+
+*Make sure to run the commands below every time you start your machine prior to achieving the project objectives:
+
+sudo systemctl start docker
+
+sudo systemctl enable docker
+
+run_keybase
+
+
+
+2. Chose a unique bucket name to be created within AWS: [YOUR_S3_BUCKET_NAME]
+
+
+
+3. Created a folder called terraform-state and then changed the directory to the terraform-state folder
+
+
+
+4. Used the commands below to create the terraform state environment. 
+
+mkdir bin
+touch bin/apply
+touch bin/destroy
+touch bin/docker
+touch bin/init
+touch bin/plan
+touch bin/show_creds
+touch bin/terraform
+
+
+mkdir src
+touch src/data-sources.tf
+touch src/dynamodb.tf
+touch src/iam.tf
+touch src/kms.tf
+touch src/output.tf
+touch src/provider.tf
+touch src/s3.tf
+touch src/variables.tf
+
+
+5. Used the following commands to add the relevant codes from the website instructions to the documents.
+
+vim bin/apply
+vim bin/init
+vim bin/plan
+vim bin/destroy
+vim bin/show_creds
+vim bin/docker
+vim bin/terraform
+
+
+vim src/data-sources.tf
+vim src/dynamodb.tf
+vim src/iam.tf
+vim src/kms.tf
+vim src/output.tf
+vim src/provider.tf
+vim src/s3.tf
+vim src/variables.tf (changed the user to 'cloud_user' which is the default user for ACloudGuru sandboxes)
+
+
+
+6. Fired up an AWS sandbox environment.
+
+Username:          cloud_user
+Password:          [YOUR_SANDBOX_PASSWORD]
+URL:               [YOUR_SANDBOX_URL]
+Access Key:        [YOUR_SANDBOX_ACCESS_KEY]
+Secret Access Key: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+
+
+
+7. I exported the following variables below:
+
+export AWS_DEFAULT_REGION='us-east-1'
+export AWS_ACCESS_KEY_ID='[YOUR_SANDBOX_ACCESS_KEY]'
+export AWS_SECRET_ACCESS_KEY='[YOUR_SANDBOX_SECRET_ACCESS_KEY]'
+export KEYBASE_USERNAME='[YOUR_KEYBASE_USERNAME]'
+
+
+
+8. Renamed the files so that they would be run in the correct order (since there is no main.tf file, terraform would typically run the files below in alphabetical order):
+
+mv src/provider.tf src/01_provider.tf
+mv src/variables.tf src/02_variables.tf
+mv src/iam.tf src/03_iam.tf
+mv src/kms.tf src/04_kms.tf
+mv src/s3.tf src/05_s3.tf
+mv src/data-sources.tf src/06_data-sources.tf
+mv src/dynamodb.tf src/07_dynamodb.tf
+mv src/output.tf src/08_output.tf
+
+[Adjusted file editing commands]
+
+vim src/06_data-sources.tf
+vim src/07_dynamodb.tf
+vim src/03_iam.tf
+vim src/04_kms.tf
+vim src/08_output.tf
+vim src/01_provider.tf
+vim src/05_s3.tf
+vim src/02_variables.tf (changed the user to 'cloud_user' which is the default user for ACloudGuru sandboxes)
+
+
+
+9. Ran the following command while in the terraform-state folder in order to make sure that the file is an executable one. 
+
+chmod +x ./bin/*
+
+
+
+10. Ran the following commands from the terraform-state folder location:
+
+bin/init
+bin/plan
+bin/apply
+
+
+
+11. Ran the following commands in order to change the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY variables from the admin user that was used to log into AWS to the credentials for the newly created AWS user that will be responsible for managing the Terraform state.
+
+bin/show_creds
+
+export AWS_ACCESS_KEY_ID='[YOUR_GENERATED_TERRAFORM_USER_ACCESS_KEY]'
+export AWS_SECRET_ACCESS_KEY='[YOUR_GENERATED_TERRAFORM_USER_SECRET_ACCESS_KEY]'
+
+
+12. Added the following files:
+
+touch bin/init_backend
+touch src/backend.tf
+
+
+13. Added the relevant configuration code to the new files. Make sure to choose a convenient name for the DynamoDB table:
+
+vim bin/init_backend
+vim src/09_backend.tf
+
+
+14. Run the command below to ensure that there are execute privileges on the relevant files:
+
+chmod +x ./bin/init_backend
+
+
+15. Ran the following commands:
+
+bin/init_backend
+bin/plan
+
+
+And that's it! You should now see messaging in your terminal that has to do with an option to migrate the state file to the remote backend and/or releasing the state lock file! This project is a great way to understand how IAM and KMS services work. The project is also a great way to understand what a terraform state file is, what a terraform lock file is, and how to migrate those files for a specific terraform deployment to the cloud in order to have a shared location for big terraform projects that will share state.
