@@ -1,0 +1,254 @@
+This was a great project that taught me how to import a terraform state into a local environment. With regard to ACloudGuru sandbox environments, users cannot create resource groups -- they must create resources within the default resource group that is provided. I initially thought this would be a major limitation to my ability to use Terraform to build certain architectures in Azure, but I asked for help from the company and they offered a solution of importing the resource group into my local terraform state by referencing it's ARM ID (Resource ID in the properties section of the Resource Group). By doing that, I was able to create a simple deployment that deploys a Flask application onto an Azure VM!
+
+
+1. Launched an ACloudGuru Amazon Linux 2 server. 
+
+Username: [YOUR_SERVER_USERNAME]
+Password: [YOUR_SERVER_PASSWORD]
+
+Public IP: [YOUR_SERVER_PUBLIC_IP]
+Private IP: [YOUR_SERVER_PRIVATE_IP]
+IPv6: [YOUR_SERVER_IPv6]
+
+
+
+2. I'm trying to use a Terraform configuration to deploy a flask website in the cloud using Azure sandboxes. Practicing an Azure deployment should make it easier for when I try to integrate AI into the app by using the Azure OpenAI founder credits. If I build this app  My goal today is to just see a flask website up and running from a public IP attached to an Azure VM. Small steps. I made a folder called terraform_flask_azure, made a main.tf file in there, and added the code below to main.tf:
+
+
+provider "azurerm" {
+  skip_provider_registration = true
+  features {}
+  subscription_id = "[YOUR_AZURE_SUBSCRIPTION_ID]"
+  client_id       = "[YOUR_AZURE_CLIENT_ID]"
+  client_secret   = "[YOUR_AZURE_CLIENT_SECRET]"
+  tenant_id       = "[YOUR_AZURE_TENANT_ID]"
+}
+
+variable "resource_group_name" {
+  description = "The name of the Azure resource group"
+  default     = "[YOUR_AZURE_SANDBOX_NAME]"  # Replace this with the actual resource group name
+}
+
+resource "azurerm_resource_group" "flask_resource_group" {
+  name     = var.resource_group_name
+  location = "[YOUR_AZURE_SANDBOX_REGION]" # Replace this with the actual resource group region
+}
+
+resource "azurerm_virtual_network" "flask_virtual_network" {
+  name                = "flask_virtual_network"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.flask_resource_group.location
+  resource_group_name = azurerm_resource_group.flask_resource_group.name
+}
+
+resource "azurerm_subnet" "flask_subnet" {
+  name                 = "flask_subnet"
+  resource_group_name  = azurerm_resource_group.flask_resource_group.name
+  virtual_network_name = azurerm_virtual_network.flask_virtual_network.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
+
+resource "azurerm_public_ip" "flask_public_ip" {
+  name                = "flask_public_ip"
+  location            = azurerm_resource_group.flask_resource_group.location
+  resource_group_name = azurerm_resource_group.flask_resource_group.name
+  allocation_method   = "Static"
+}
+
+resource "azurerm_network_interface" "flask_network_interface" {
+  name                = "flask_network_interface"
+  location            = azurerm_resource_group.flask_resource_group.location
+  resource_group_name = azurerm_resource_group.flask_resource_group.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.flask_subnet.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.flask_public_ip.id
+  }
+}
+
+resource "azurerm_linux_virtual_machine" "flask-vm" {
+  name                            = "flask-vm"
+  location                        = azurerm_resource_group.flask_resource_group.location
+  resource_group_name             = azurerm_resource_group.flask_resource_group.name
+  network_interface_ids           = [azurerm_network_interface.flask_network_interface.id]
+  size                            = "Standard_DS1_v2"
+  admin_username                  = "azureuser"
+  disable_password_authentication = true
+
+  admin_ssh_key {
+    username   = "azureuser"
+    public_key = file("~/.ssh/id_rsa.pub")  # Update this path if needed
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "azureuser"
+    private_key = file("~/.ssh/id_rsa")
+    host        = azurerm_public_ip.flask_public_ip.ip_address
+    timeout = "1m"
+    #agent = true
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  os_disk {
+    name              = "flask_os_disk"
+    caching           = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+    "sudo apt-get update",
+    "sudo apt-get install -y python3 python3-pip",
+    "sudo pip3 install flask",
+    "sudo mkdir /opt/flask",
+    "sudo chown -R azureuser:azureuser /opt/flask",
+    "echo 'from flask import Flask\napp = Flask(__name__)\n\n@app.route(\"/\")\ndef hello():\n  return \"Hello flask!\"' > /opt/flask/app.py",
+    "FLASK_APP=/opt/flask/app.py python3 -m flask run --host=0.0.0.0 --port=5000"
+    ]
+  }
+}
+
+resource "azurerm_network_security_group" "flask_nsg" {
+  name                = "flask_nsg"
+  location            = azurerm_resource_group.flask_resource_group.location
+  resource_group_name = azurerm_resource_group.flask_resource_group.name
+
+  security_rule {
+    name                       = "SSH"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "HTTP"
+    priority                   = 1002
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "HTTPS"
+    priority                   = 1003
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "AllowPing"
+    priority                   = 1004
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Icmp"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Flask"
+    priority                   = 1005
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "5000"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_subnet_network_security_group_association" "flask_nsg_association" {
+  subnet_id                 = azurerm_subnet.flask_subnet.id
+  network_security_group_id = azurerm_network_security_group.flask_nsg.id
+}                                                                            
+
+
+3. Realized that I forgot to download terraform on my new Amazon Linux 2 rental. Went to the website below:
+
+https://developer.hashicorp.com/terraform/install
+
+and retrieved the following code for Amazon Linux:
+
+sudo yum install -y yum-utils shadow-utils
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+sudo yum -y install terraform
+
+
+
+4. The provisioning needed an ssh key that was specified in the code. so I had to run the following code below:
+
+ssh-keygen -t rsa -b 4096 -C "[YOUR_EMAIL_ADDRESS]"
+
+
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/[YOUR_SERVER_USERNAME]/.ssh/id_rsa):
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/[YOUR_SERVER_USERNAME]/.ssh/id_rsa.
+Your public key has been saved in /home/[YOUR_SERVER_USERNAME]/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:abcdefghijklmnopqrstuvwxyz1234567890 your_email@example.com
+The key's randomart image is:
++---[RSA 4096]----+
+|                 |
+|                 |
+|           .     |
+|          . . .  |
+|      . S . + . +|
+|       o * = * =+|
+|      o * X * X.o|
+|       + * B * oE|
+|      . o.+@ * +B|
++----[SHA256]-----+
+
+I then tried to change the permissions of the key file so that it can be used in the provisioning of the vm:
+
+chmod 600 ~/.ssh/id_rsa
+
+6. I have to import the existing azure resource group into the terraform state by using the command below:
+
+terraform import azurerm_resource_group.flask_resource_group /subscriptions/[YOUR_AZURE_SUBSCRIPTION_ID]/resourceGroups/[YOUR_AZURE_SANDBOX_NAME]
+
+where the last part of the command is called the ARM ID or Resource ID. To find the Resource ID, go to Settings --> Properties on the left hand side, and locate the Resource ID
+
+use the code below to re-provision the vm in case there are issues with the configuration:
+
+terraform taint azurerm_linux_virtual_machine.flask-vm
+
+Also to clear known hosts with ssh:
+
+vim ~/.ssh/known_hosts
+
+7. Voila! I got a basic flask app up and running in an azure VM. If you're having trouble, make sure to clear the known_hosts file on the ACloudGuru server, ssh into the vm using the 'ssh azureuser@vm_public_ip' command. to issue the command to run the flask application:
+
+nohup FLASK_APP=/opt/flask/app.py python3 -m flask run --host=0.0.0.0 --port=5000 > /dev/null 2>&1 &
+
+OR 
+
+FLASK_APP=/opt/flask/app.py python3 -m flask run --host=0.0.0.0 --port=5000
