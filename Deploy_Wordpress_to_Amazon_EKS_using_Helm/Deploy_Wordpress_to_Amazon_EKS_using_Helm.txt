@@ -1,0 +1,173 @@
+8 p.m. - 12 a.m.
+
+- Today I'm going to try to set up a wordpress site on Amazon EKS using a Helm chart. Helm is basically what pip is to python but for Kubernetes -- it's a package manager for those who want to deploy their apps on containers. 
+
+
+
+https://dev.to/aws-builders/how-to-deploy-wordpress-to-amazon-eks-using-helm-5dli
+
+
+
+1. Launched an ACloudGuru Amazon Linux 2 server. 
+
+Username: cloud_user
+Password: [YOUR_SERVER_PASSWORD]
+
+Public IP: [YOUR_SERVER_PUBLIC_IP]
+Private IP: [YOUR_SERVER_PRIVATE_IP]
+IPv6: [YOUR_SERVER_IPv6]
+
+
+2. Set up an ACloudGuru AWS Sandbox.
+
+Username:          cloud_user
+Password:          [YOUR_SANDBOX_PASSWORD]
+URL:               [YOUR_SANDBOX_URL]
+Access Key ID:     [YOUR_SANDBOX_ACCESS_KEY]
+Secret Access Key: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+
+
+3. Entered the 'aws configure' command to change the AWS credentials
+
+
+[cloud_user@30e886e91d1c ~]$ aws configure
+AWS Access Key ID [****************66GI]: [YOUR_SANDBOX_ACCESS_KEY]
+AWS Secret Access Key [****************MdIt]: [YOUR_SANDBOX_SECRET_ACCESS_KEY]
+Default region name [us-east-1]: us-east-1
+Default output format [json]: json
+
+
+
+4. Went to the website below and followed the instructions for a UNIX install of the EKS CTL:
+
+https://eksctl.io/installation/
+
+
+
+5. Went to the website below and followed the instructions for a LINUX install of Kubectl:
+
+https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+
+
+
+6. Went to the website below and followed the instructions to install Helm from a script. 
+
+https://helm.sh/docs/intro/install/
+
+Helm was installed, although there may have been some issues in terms of requiring Git, so I went ahead and installed git with the following commands:
+
+sudo yum update
+
+sudo yum install git
+
+
+
+7. Ran the following code to create a keypair for EC2 clusters in the AWS sandbox account:
+
+aws ec2 create-key-pair --key-name awshelm --query 'KeyMaterial' --output text > awshelm.pem
+
+
+
+8. Ran the code below to create a YAML file that should provision a Kubernetes cluster using a CloudFormation stack in the sandbox account. 
+
+cat <<EOF>>demo-eks-cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: demo-eks-cluster
+  region: us-east-1
+  version: "1.29"
+
+managedNodeGroups:
+  - name: dev-ng-1
+    instanceType: t3.medium
+    minSize: 1
+    maxSize: 1
+    desiredCapacity: 1
+    volumeSize: 20
+    volumeEncrypted: true
+    volumeType: gp3
+    ssh:
+      allow: true
+      publicKeyName: awshelm
+    tags:
+      Env: Dev
+    iam:
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+      withAddonPolicies:
+        autoScaler: true
+EOF
+
+
+
+9. Ran the following code using the EKSCTL command line utility that was downloaded in step 4 in order to execute the YAML file to provision the cluster:
+
+eksctl create cluster -f demo-eks-cluster.yaml
+
+
+
+10. Opened the kube config file in order to change all instances of the v1alpha1 api version to v1beta1. This is a necessary step after running into an error during the the cluster provisioning.
+
+vim ~/.kube/config
+
+v1alpha1 ---> v1beta1
+
+stackoverflow error source:
+
+https://stackoverflow.com/questions/71318743/kubectl-versions-error-exec-plugin-is-configured-to-use-api-version-client-auth
+
+Once this change is made, you can use the kubectl commands ('kubectl get nodes', 'kubectl get pods', etc.) on your provisioned EKS cluster.
+
+
+
+11. Ran the code below to add the wordpress helm charts (with the generic YAML files to install wordpress on any cluster, the way pip would have the generic files to install packages on any machine running a compatible version of python)
+
+helm repo add my-repo https://charts.bitnami.com/bitnami
+
+
+
+12. Ran the code below to run the helm chart that will install wordpress onto the cluster:
+
+helm install my-release my-repo/wordpress --set wordpressPassword=password
+
+
+
+13. Ran the code below to run and install the EBS driver that wordpress will need to interact with the block storage that is attached to the cluster in order to load particular persistent volumes for the wordpress site.
+
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+helm repo update
+helm install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver --namespace kube-system --set controller.replicaCount=2
+
+
+
+14. Ran the code below to make sure the load balancer is up an running. A functioning load balancer attached to the cluster is crucial for wordpress to be accessible over the web.
+
+kubectl get svc --namespace default -w my-release-wordpress
+
+
+
+15. Ran the code below to get the HTTP URL for the blog site (notice that the --include flag from the reference site was replaced with the --template flag according to the instructions for my version of kubectl. If the code below doesn't work, try using the --include flag)
+
+
+export SERVICE_IP=$(kubectl get svc --namespace default my-release-wordpress --template "{{ range (index .status.loadBalancer.ingress 0) }}{{ . }}{{ end }}")
+
+
+
+16. Ran the code below to make sure I got the URLs that I needed 
+
+echo "WordPress URL: http://$SERVICE_IP/"
+
+echo "WordPress Admin URL: http://$SERVICE_IP/admin"
+
+
+
+Et voila! You should be able to have an up and running wordpress site on an EKS cluster in AWS. Helm makes it really easy for people to setup generic applications in the cloud -- what makes helm so special is that it is used for apps that are to be run on containers, which maximizes flexibility in terms of the underlying OS and hardware architecture.
+
+ 
